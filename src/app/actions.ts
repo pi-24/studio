@@ -1,7 +1,7 @@
 
 "use server";
 
-import type { RotaInput, ProcessedRotaResult, ComplianceResultDetail, ProcessedShift, ShiftDefinition } from '@/types';
+import type { RotaInput, ProcessedRotaResult, ComplianceResultDetail, ProcessedShift, ShiftDefinition, RotaGridInput, RotaSpecificScheduleMetadata } from '@/types';
 import { z } from 'zod';
 
 // --- Helper Functions ---
@@ -825,12 +825,12 @@ const WORKING_LIMITS = [
   },
   {
     id: 'weekendFrequency',
-    name: 'Weekend Work Frequency',
-    description: 'Work no more than 1 in 3 weekends (max 1 in 2).',
+    name: 'Actual Calendar Weekend Work Frequency', // Renamed
+    description: 'Work no more than 1 in 3 actual calendar weekends. Max 1 in 2. Considers rota start date.', // Updated description
     pdfReference: 'Schedule 3, Para 16 & 18',
     category: CATEGORIES.WEEKEND_WORK,
     check: (shifts: ProcessedShift[], scheduleWeeks: number) => {
-        if (!shifts || !shifts.length || !scheduleWeeks || scheduleWeeks < 1) return { isViolated: false, userValue: 'N/A', limitValue: '1 in 3 (max 1 in 2)', difference: 'N/A', details: 'Not enough data.' };
+        if (!shifts || !shifts.length || !scheduleWeeks || scheduleWeeks < 1) return { isViolated: false, userValue: 'N/A', limitValue: '1 in 3 (max 1 in 2)', difference: 'N/A', details: 'Not enough data for actual weekend check.' };
         
         const weekendsWorked = new Set<string>();
         shifts.forEach(shift => {
@@ -840,23 +840,23 @@ const WORKING_LIMITS = [
     
                 const saturdayKeyDate = new Date(shiftActualStart);
                 saturdayKeyDate.setHours(0, 0, 0, 0); 
-                saturdayKeyDate.setDate(saturdayKeyDate.getDate() - dayOfWeekOfShiftStart + (dayOfWeekOfShiftStart === 0 ? -1 : 6));
+                saturdayKeyDate.setDate(saturdayKeyDate.getDate() - dayOfWeekOfShiftStart + (dayOfWeekOfShiftStart === 0 ? -1 : 6)); // Corrected: 0 (Sun) -> -1+6 = 5 (Sat), 6 (Sat) -> -6+6=0 (Sat) -> This formula is fine.
                 
                 weekendsWorked.add(saturdayKeyDate.toISOString().split('T')[0]);
             }
         });
         
         const numWeekendsWorked = weekendsWorked.size;
-        const totalWeekendsInSchedule = scheduleWeeks; // This is the rota cycle length
+        const totalWeekendsInSchedule = scheduleWeeks; 
         
         let frequencyText = 'N/A';
-        let calculatedFrequencyRatio = Infinity; // Higher is better (less frequent)
+        let calculatedFrequencyRatio = Infinity; 
 
         if (numWeekendsWorked > 0 && totalWeekendsInSchedule > 0) {
           calculatedFrequencyRatio = totalWeekendsInSchedule / numWeekendsWorked;
           frequencyText = `1 in ${calculatedFrequencyRatio.toFixed(1)}`;
         } else if (numWeekendsWorked === 0) {
-          frequencyText = '0 weekends worked';
+          frequencyText = '0 actual weekends worked';
         }
 
         const violates1in3Guideline = numWeekendsWorked > 0 && calculatedFrequencyRatio < 3;
@@ -866,18 +866,18 @@ const WORKING_LIMITS = [
         let violationSummary = '';
 
         if (violates1in2AbsoluteMax) {
-            violationSummary = 'Exceeds 1 in 2 limit (absolute max).';
+            violationSummary = 'Exceeds 1 in 2 limit (actual weekends).';
         } else if (violates1in3Guideline) {
-            violationSummary = 'Exceeds 1 in 3 guidance.';
+            violationSummary = 'Exceeds 1 in 3 guidance (actual weekends).';
         }
         
-        const details = `Worked ${numWeekendsWorked} weekends in ${totalWeekendsInSchedule}-week cycle (${frequencyText}).`;
+        const details = `Worked ${numWeekendsWorked} actual calendar weekends in ${totalWeekendsInSchedule}-week cycle (${frequencyText}). This check is based on rota start date.`;
         
         return {
             isViolated: isActuallyViolated,
             userValue: frequencyText, 
             limitValue: '1 in 3 (max 1 in 2)',
-            difference: violationSummary || (numWeekendsWorked === 0 ? 'No weekends worked' : 'Met'), 
+            difference: violationSummary || (numWeekendsWorked === 0 ? 'No actual weekends worked' : 'Met'), 
             details,
         };
     },
@@ -957,11 +957,12 @@ const rotaInputSchema = z.object({
     wtrOptOut: z.boolean(),
     scheduleTotalWeeks: z.number().min(1).max(52),
     scheduleStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // Added endDate to scheduleMeta for processing
-    site: z.string(), // Added site
-    specialty: z.string(), // Added specialty
+    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), 
+    site: z.string(), 
+    specialty: z.string(), 
     annualLeaveEntitlement: z.number().min(0),
     hoursInNormalDay: z.number().min(0).max(24),
+    rotaName: z.string().optional(), // Added rotaName to schema
   }),
   shiftDefinitions: z.array(z.object({
     id: z.string(),
@@ -975,6 +976,62 @@ const rotaInputSchema = z.object({
   rotaGrid: z.record(z.string()), // week_X_day_Y: dutyCode
 });
 
+// New helper function for pattern weekend check
+function checkPatternWeekendFrequency(
+    rotaGrid: RotaGridInput,
+    scheduleTotalWeeks: number
+): Omit<ComplianceResultDetail, 'id' | 'name' | 'description' | 'pdfReference' | 'category'> {
+    if (!rotaGrid || scheduleTotalWeeks < 1) {
+        return { isViolated: false, userValue: 'N/A', limitValue: '1 in 3 (max 1 in 2)', difference: 'N/A', details: 'Not enough data for pattern weekend check.' };
+    }
+
+    let patternWeekendsWorkedCount = 0;
+    const workedPatternWeekendIndices = new Set<number>();
+
+    for (let w = 0; w < scheduleTotalWeeks; w++) {
+        // Grid assumes Mon=0, Tue=1, ..., Sat=5, Sun=6 for day_X
+        const satShiftCode = rotaGrid[`week_${w}_day_5`]; 
+        const sunShiftCode = rotaGrid[`week_${w}_day_6`];
+
+        if ((satShiftCode && satShiftCode !== "") || (sunShiftCode && sunShiftCode !== "")) {
+            workedPatternWeekendIndices.add(w);
+        }
+    }
+    patternWeekendsWorkedCount = workedPatternWeekendIndices.size;
+
+    let frequencyText = 'N/A';
+    let calculatedFrequencyRatio = Infinity;
+
+    if (patternWeekendsWorkedCount > 0 && scheduleTotalWeeks > 0) {
+        calculatedFrequencyRatio = scheduleTotalWeeks / patternWeekendsWorkedCount;
+        frequencyText = `1 in ${calculatedFrequencyRatio.toFixed(1)}`;
+    } else if (patternWeekendsWorkedCount === 0) {
+        frequencyText = '0 pattern weekends worked';
+    }
+
+    const violates1in3Guideline = patternWeekendsWorkedCount > 0 && calculatedFrequencyRatio < 3;
+    const violates1in2AbsoluteMax = patternWeekendsWorkedCount > 0 && calculatedFrequencyRatio < 2;
+    
+    const isViolated = violates1in3Guideline; 
+    let violationSummary = '';
+
+    if (violates1in2AbsoluteMax) {
+        violationSummary = 'Exceeds 1 in 2 limit (pattern weekends).';
+    } else if (violates1in3Guideline) {
+        violationSummary = 'Exceeds 1 in 3 guidance (pattern weekends).';
+    }
+    
+    const details = `Worked shifts in Sat/Sun columns on ${patternWeekendsWorkedCount} week(s) of the ${scheduleTotalWeeks}-week pattern (${frequencyText}). This check ignores rota start date.`;
+    
+    return {
+        isViolated,
+        userValue: frequencyText,
+        limitValue: '1 in 3 (max 1 in 2)',
+        difference: violationSummary || (patternWeekendsWorkedCount === 0 ? 'No pattern weekends worked' : 'Met'),
+        details,
+    };
+}
+
 
 export async function processRota(data: RotaInput): Promise<ProcessedRotaResult | { error: string; fieldErrors?: z.ZodIssue[]; }> {
   const validation = rotaInputSchema.safeParse(data);
@@ -987,7 +1044,6 @@ export async function processRota(data: RotaInput): Promise<ProcessedRotaResult 
 
   const { scheduleMeta, shiftDefinitions, rotaGrid } = validation.data;
 
-  // 1. Process Rota Grid into a flat list of ProcessedShift objects
   const processedShifts: ProcessedShift[] = [];
   const scheduleStartDateObj = new Date(scheduleMeta.scheduleStartDate);
   if (isNaN(scheduleStartDateObj.getTime())) {
@@ -1000,7 +1056,7 @@ export async function processRota(data: RotaInput): Promise<ProcessedRotaResult 
   }, {} as Record<string, ShiftDefinition>);
 
   for (let w = 0; w < scheduleMeta.scheduleTotalWeeks; w++) {
-      for (let d = 0; d < 7; d++) { // Mon to Sun (0 to 6 if getDay() is used, assuming d is 0-indexed for day of week)
+      for (let d = 0; d < 7; d++) { 
           const dutyCode = rotaGrid[`week_${w}_day_${d}`];
           if (dutyCode && defMap[dutyCode]) {
               const def = defMap[dutyCode];
@@ -1036,7 +1092,6 @@ export async function processRota(data: RotaInput): Promise<ProcessedRotaResult 
       }
   }
   
-  // 2. Run Compliance Checks
   const complianceResultDetails: ComplianceResultDetail[] = WORKING_LIMITS.map(limitRule => {
     const checkResult = limitRule.check(
         processedShifts,
@@ -1053,21 +1108,40 @@ export async function processRota(data: RotaInput): Promise<ProcessedRotaResult 
         pdfReference: limitRule.pdfReference,
         category: limitRule.category
     };
+  }).filter(Boolean) as ComplianceResultDetail[];
+
+
+  // Add the new pattern weekend check
+  const patternWeekendCheckResult = checkPatternWeekendFrequency(rotaGrid, scheduleMeta.scheduleTotalWeeks);
+  complianceResultDetails.push({
+    ...patternWeekendCheckResult,
+    id: 'patternWeekendFrequency',
+    name: 'Pattern Weekend Work Frequency',
+    description: 'Work no more than 1 in 3 weekends based on rota grid pattern (Sat/Sun columns). Max 1 in 2.',
+    pdfReference: 'Schedule 3, Para 16 & 18 (Interpreted for Pattern)',
+    category: CATEGORIES.WEEKEND_WORK,
   });
 
   const overallSummary = complianceResultDetails.some(cr => cr.isViolated) ? "Review Needed" : "Compliant";
-
-  // Calculate total hours (example, can be refined)
   const totalHoursWorked = processedShifts.reduce((sum, shift) => sum + calculateDurationInHours(shift.start, shift.end), 0);
+
+  // Sort compliance messages by category order, then by name
+  complianceResultDetails.sort((a, b) => {
+    const categoryAIndex = CATEGORY_ORDER.indexOf(a.category);
+    const categoryBIndex = CATEGORY_ORDER.indexOf(b.category);
+    if (categoryAIndex !== categoryBIndex) {
+        return categoryAIndex - categoryBIndex;
+    }
+    return a.name.localeCompare(b.name);
+  });
+
 
   return {
     totalHours: parseFloat(totalHoursWorked.toFixed(2)),
-    totalBreakHours: 0, // Placeholder, break logic is part of compliance checks not direct sum
-    payableHours: parseFloat(totalHoursWorked.toFixed(2)), // Placeholder
+    totalBreakHours: 0, 
+    payableHours: parseFloat(totalHoursWorked.toFixed(2)), 
     complianceSummary: overallSummary,
     complianceMessages: complianceResultDetails,
-    estimatedSalary: 0, // Placeholder
+    estimatedSalary: 0, 
   };
 }
-
-    
