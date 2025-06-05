@@ -40,7 +40,7 @@ const calculateShiftDurationString = (startTimeStr: string, finishTimeStr: strin
 
 const shiftDefinitionSchema = z.object({
   id: z.string(),
-  dutyCode: z.string().min(1, 'Duty Code required').regex(/^[a-zA-Z0-9]+$/, 'Alphanumeric only'),
+  dutyCode: z.string().min(1, 'Duty Code required').regex(/^[a-zA-Z0-9]+$/, 'Alphanumeric only, no spaces or symbols'),
   name: z.string().min(1, 'Name required'),
   type: z.enum(['normal', 'on-call']),
   startTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Start HH:MM'),
@@ -58,7 +58,14 @@ const rotaSpecificScheduleMetadataSchema = z.object({
   wtrOptOut: z.boolean(),
   annualLeaveEntitlement: z.number().min(0, "Min 0 days"),
   hoursInNormalDay: z.number().min(1, "Min 1 hour").max(24, "Max 24 hours"),
-}).refine(data => new Date(data.endDate) >= new Date(data.scheduleStartDate), {
+}).refine(data => {
+    if (!data.scheduleStartDate || !data.endDate) return true; // Let individual field validation handle empty/malformed dates
+    try {
+        return new Date(data.endDate) >= new Date(data.scheduleStartDate);
+    } catch (e) {
+        return true; // Invalid date format will be caught by regex
+    }
+}, {
     message: "End date must be after or the same as start date",
     path: ["endDate"],
 });
@@ -68,9 +75,12 @@ const rotaGridSchema = z.record(z.string());
 const uploadRotaSchema = z.object({
   scheduleMeta: rotaSpecificScheduleMetadataSchema,
   shiftDefinitions: z.array(shiftDefinitionSchema).min(1, 'At least one shift definition is required')
-    .refine(items => new Set(items.map(item => item.dutyCode)).size === items.length, {
+    .refine(items => {
+        const dutyCodes = items.map(item => item.dutyCode);
+        return new Set(dutyCodes).size === dutyCodes.length;
+    }, {
       message: 'Duty Codes must be unique',
-      path: ['shiftDefinitions']
+      path: ['shiftDefinitions'] 
     }),
   rotaGrid: rotaGridSchema.optional(),
 });
@@ -93,7 +103,7 @@ export default function UploadRotaPage() {
         site: '',
         specialty: '',
         scheduleStartDate: new Date().toISOString().split('T')[0],
-        endDate: new Date(new Date().setDate(new Date().getDate() + 28)).toISOString().split('T')[0], // Default to 4 weeks later
+        endDate: new Date(new Date().setDate(new Date().getDate() + 28)).toISOString().split('T')[0],
         scheduleTotalWeeks: 4, 
         wtrOptOut: false,
         annualLeaveEntitlement: 27,
@@ -114,7 +124,7 @@ export default function UploadRotaPage() {
 
   useEffect(() => {
     watchedShiftDefinitions.forEach((def, index) => {
-      if (def) { // Check if def is defined
+      if (def && typeof def.startTime === 'string' && typeof def.finishTime === 'string') {
         const newDuration = calculateShiftDurationString(def.startTime, def.finishTime);
         if (def.durationStr !== newDuration) {
           setValue(`shiftDefinitions.${index}.durationStr`, newDuration, { shouldValidate: false, shouldDirty: false });
@@ -125,17 +135,26 @@ export default function UploadRotaPage() {
 
   useEffect(() => {
     if (watchedScheduleMeta?.scheduleStartDate && watchedScheduleMeta?.endDate) {
-      const start = new Date(watchedScheduleMeta.scheduleStartDate);
-      const end = new Date(watchedScheduleMeta.endDate);
-      if (end >= start) {
-        const diffTime = Math.abs(end.getTime() - start.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) +1; // +1 to include start day
-        const diffWeeks = Math.ceil(diffDays / 7);
-        if (watchedScheduleMeta.scheduleTotalWeeks !== diffWeeks) {
-          setValue('scheduleMeta.scheduleTotalWeeks', diffWeeks > 0 ? diffWeeks : 1, { shouldValidate: true });
+      try {
+        const start = new Date(watchedScheduleMeta.scheduleStartDate);
+        const end = new Date(watchedScheduleMeta.endDate);
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end >= start) {
+          const diffTime = Math.abs(end.getTime() - start.getTime());
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; 
+          const diffWeeks = Math.ceil(diffDays / 7);
+          if (watchedScheduleMeta.scheduleTotalWeeks !== diffWeeks && diffWeeks > 0) {
+            setValue('scheduleMeta.scheduleTotalWeeks', diffWeeks, { shouldValidate: true });
+          } else if (diffWeeks <= 0 && watchedScheduleMeta.scheduleTotalWeeks !== 1) {
+            setValue('scheduleMeta.scheduleTotalWeeks', 1, { shouldValidate: true });
+          }
+        } else if (end < start && watchedScheduleMeta.scheduleTotalWeeks !== 1) {
+           setValue('scheduleMeta.scheduleTotalWeeks', 1, { shouldValidate: true }); // Default to 1 if end date is before start
         }
-      } else {
-         setValue('scheduleMeta.scheduleTotalWeeks', 1, { shouldValidate: true });
+      } catch (e) {
+        // Handle invalid date strings if necessary, though regex should catch them
+        if (watchedScheduleMeta.scheduleTotalWeeks !== 1) {
+          setValue('scheduleMeta.scheduleTotalWeeks', 1, { shouldValidate: true });
+        }
       }
     }
   }, [watchedScheduleMeta?.scheduleStartDate, watchedScheduleMeta?.endDate, setValue, watchedScheduleMeta?.scheduleTotalWeeks]);
@@ -147,12 +166,20 @@ export default function UploadRotaPage() {
         router.push('/login');
         return;
     }
+    
+    const finalRotaGrid: RotaGridInput = {};
+    if (data.rotaGrid) {
+        for (const key in data.rotaGrid) {
+            finalRotaGrid[key] = data.rotaGrid[key] === "_OFF_" ? "" : data.rotaGrid[key];
+        }
+    }
+
     const newRotaDocument: RotaDocument = {
       id: crypto.randomUUID(),
       name: data.scheduleMeta.name,
       scheduleMeta: data.scheduleMeta,
       shiftDefinitions: data.shiftDefinitions,
-      rotaGrid: data.rotaGrid || {},
+      rotaGrid: finalRotaGrid, 
       createdAt: new Date().toISOString(),
     };
     addRotaDocument(newRotaDocument);
@@ -161,14 +188,15 @@ export default function UploadRotaPage() {
   };
   
   const addShiftDefinition = () => {
-    appendShiftDef({ id: crypto.randomUUID(), dutyCode: `S${shiftDefFields.length + 1}`, name: '', type: 'normal', startTime: '09:00', finishTime: '17:00', durationStr: '8h 0m' });
+    const newDutyCode = `S${shiftDefFields.length + 1}`;
+    appendShiftDef({ id: crypto.randomUUID(), dutyCode: newDutyCode, name: '', type: 'normal', startTime: '09:00', finishTime: '17:00', durationStr: '8h 0m' });
   };
 
   const validateStep = async (step: number) => {
-    let fieldsToValidate: (keyof UploadRotaFormValues | `scheduleMeta.${keyof RotaSpecificScheduleMetadata}` | `shiftDefinitions.${number}.${keyof ShiftDefinitionType}` )[] = [];
+    let fieldsToValidate: (keyof UploadRotaFormValues | `scheduleMeta.${keyof RotaSpecificScheduleMetadata}` | `shiftDefinitions.${number}.${keyof ShiftDefinitionType}` | 'shiftDefinitions' )[] = [];
     if (step === 1) fieldsToValidate = ['scheduleMeta'];
-    if (step === 2) fieldsToValidate = ['shiftDefinitions'];
-    if (step === 3) fieldsToValidate = ['rotaGrid' as any]; // rotaGrid itself is optional, but individual cells can be considered
+    if (step === 2) fieldsToValidate = ['shiftDefinitions']; // Validates the whole array and its elements
+    if (step === 3) fieldsToValidate = ['rotaGrid' as any]; 
     
     const isValid = await trigger(fieldsToValidate as any); 
     return isValid;
@@ -239,7 +267,7 @@ export default function UploadRotaPage() {
                     </div>
                   </div>
                   <div>
-                    <Label htmlFor="scheduleMeta.scheduleTotalWeeks" className="text-muted-foreground">Number of Weeks in Rota Cycle (auto-calculated from dates)</Label>
+                    <Label htmlFor="scheduleMeta.scheduleTotalWeeks" className="text-muted-foreground">Number of Weeks in Rota Cycle (auto-calculated)</Label>
                     <Input type="number" id="scheduleMeta.scheduleTotalWeeks" {...register('scheduleMeta.scheduleTotalWeeks', { valueAsNumber: true })} min="1" max="52" readOnly className="bg-muted/50"/>
                     {errors.scheduleMeta?.scheduleTotalWeeks && <p className="text-sm text-destructive mt-1">{errors.scheduleMeta.scheduleTotalWeeks.message}</p>}
                   </div>
@@ -276,8 +304,14 @@ export default function UploadRotaPage() {
                         <tbody>
                           {shiftDefFields.map((field, index) => (
                             <tr key={field.id}>
-                              <td><Input {...register(`shiftDefinitions.${index}.dutyCode`)} placeholder="S1" className="w-20"/></td>
-                              <td><Input {...register(`shiftDefinitions.${index}.name`)} placeholder="Day Shift" className="w-36"/></td>
+                              <td>
+                                <Input {...register(`shiftDefinitions.${index}.dutyCode`)} placeholder="S1" className="w-20"/>
+                                {errors.shiftDefinitions?.[index]?.dutyCode && <p className="text-xxs text-destructive mt-0.5">{errors.shiftDefinitions[index]?.dutyCode?.message}</p>}
+                              </td>
+                              <td>
+                                <Input {...register(`shiftDefinitions.${index}.name`)} placeholder="Day Shift" className="w-36"/>
+                                {errors.shiftDefinitions?.[index]?.name && <p className="text-xxs text-destructive mt-0.5">{errors.shiftDefinitions[index]?.name?.message}</p>}
+                              </td>
                               <td>
                                 <Controller name={`shiftDefinitions.${index}.type`} control={control} render={({ field: cf }) => (
                                   <Select onValueChange={cf.onChange} value={cf.value}>
@@ -285,9 +319,16 @@ export default function UploadRotaPage() {
                                     <SelectContent><SelectItem value="normal">Normal</SelectItem><SelectItem value="on-call">On-Call</SelectItem></SelectContent>
                                   </Select> )}
                                 />
+                                {errors.shiftDefinitions?.[index]?.type && <p className="text-xxs text-destructive mt-0.5">{errors.shiftDefinitions[index]?.type?.message}</p>}
                               </td>
-                              <td><Input type="time" {...register(`shiftDefinitions.${index}.startTime`)} className="w-28"/></td>
-                              <td><Input type="text" {...register(`shiftDefinitions.${index}.finishTime`)} placeholder="HH:MM or 24:00" className="w-32"/></td>
+                              <td>
+                                <Input type="time" {...register(`shiftDefinitions.${index}.startTime`)} className="w-28"/>
+                                {errors.shiftDefinitions?.[index]?.startTime && <p className="text-xxs text-destructive mt-0.5">{errors.shiftDefinitions[index]?.startTime?.message}</p>}
+                                </td>
+                              <td>
+                                <Input type="text" {...register(`shiftDefinitions.${index}.finishTime`)} placeholder="HH:MM or 24:00" className="w-32"/>
+                                {errors.shiftDefinitions?.[index]?.finishTime && <p className="text-xxs text-destructive mt-0.5">{errors.shiftDefinitions[index]?.finishTime?.message}</p>}
+                              </td>
                               <td className="text-sm pl-2">{watch(`shiftDefinitions.${index}.durationStr`)}</td>
                               <td>{shiftDefFields.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={()=>removeShiftDef(index)}><Trash2 className="h-4 w-4 text-destructive"/></Button>}</td>
                             </tr>
@@ -296,9 +337,6 @@ export default function UploadRotaPage() {
                     </table>
                   </div>
                   {errors.shiftDefinitions?.root && <p className="text-sm text-destructive mt-1">{errors.shiftDefinitions.root.message}</p>}
-                  {Array.isArray(errors.shiftDefinitions) && errors.shiftDefinitions.map((err, i) => (
-                    Object.values(err || {}).map((fieldError: any) => fieldError && <p key={`${i}-${fieldError.message}`} className="text-sm text-destructive mt-1">{fieldError.message}</p>)
-                  ))}
                   <Button type="button" variant="outline" onClick={addShiftDefinition}><PlusCircle className="mr-2 h-4 w-4" /> Add Shift Type</Button>
                 </AccordionContent>
               </AccordionItem>
@@ -308,8 +346,8 @@ export default function UploadRotaPage() {
                     <CalendarDays className="mr-2"/> Input Rota Schedule
                 </AccordionTrigger>
                 <AccordionContent className="pt-4 space-y-4">
-                    {(watchedShiftDefinitions.length === 0 || watchedShiftDefinitions.every(d => !d.dutyCode)) ? (
-                        <p className="text-amber-500">Please define shift types with Duty Codes in Step 2 before inputting the rota.</p>
+                    {(watchedShiftDefinitions.length === 0 || watchedShiftDefinitions.every(d => !d.dutyCode || d.dutyCode.trim() === '')) ? (
+                        <p className="text-amber-500">Please define valid shift types with Duty Codes in Step 2 before inputting the rota.</p>
                     ) : (
                         <div className="overflow-x-auto custom-scrollbar">
                             <table className="min-w-full divide-y divide-border border border-border">
@@ -328,18 +366,21 @@ export default function UploadRotaPage() {
                                                     <Controller
                                                         name={`rotaGrid.week_${weekIndex}_day_${dayIndex}`}
                                                         control={control}
-                                                        defaultValue=""
+                                                        defaultValue="" // Represents OFF
                                                         render={({ field }) => (
                                                             <Select onValueChange={field.onChange} value={field.value || ""}>
                                                                 <SelectTrigger className="w-full min-w-[100px] sm:min-w-[120px] h-9 text-xs">
                                                                     <SelectValue placeholder="OFF" />
                                                                 </SelectTrigger>
                                                                 <SelectContent>
-                                                                    <SelectItem value="">OFF</SelectItem>
-                                                                    {watchedShiftDefinitions.filter(d => d.dutyCode).map(def => (
-                                                                        <SelectItem key={def.id} value={def.dutyCode}>
-                                                                            {def.dutyCode} - {def.name.substring(0,12)}{def.name.length > 12 ? '...' : ''}
-                                                                        </SelectItem>
+                                                                    {/* Item for OFF, using a special value */}
+                                                                    <SelectItem value="_OFF_">OFF</SelectItem>
+                                                                    {watchedShiftDefinitions
+                                                                        .filter(def => def && typeof def.dutyCode === 'string' && def.dutyCode.trim() !== '')
+                                                                        .map(def => (
+                                                                            <SelectItem key={def.id} value={def.dutyCode}>
+                                                                                {def.dutyCode} - {def.name.substring(0,12)}{def.name.length > 12 ? '...' : ''}
+                                                                            </SelectItem>
                                                                     ))}
                                                                 </SelectContent>
                                                             </Select>
@@ -369,3 +410,6 @@ export default function UploadRotaPage() {
     </div>
   );
 }
+
+
+    
