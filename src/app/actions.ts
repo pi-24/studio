@@ -1,7 +1,7 @@
 
 "use server";
 
-import type { RotaInput, ProcessedRotaResult, ComplianceResultDetail, ProcessedShift, ShiftDefinition, RotaGridInput, RotaSpecificScheduleMetadata } from '@/types';
+import type { RotaInput, ProcessedRotaResult, ComplianceResultDetail, ProcessedShift, ShiftDefinition, RotaGridInput, RotaSpecificScheduleMetadata, RotaProcessingInput } from '@/types';
 import { z } from 'zod';
 
 // --- Helper Functions ---
@@ -57,28 +57,28 @@ const isWeekendShift = (shift: ProcessedShift): boolean => {
 
   if (isNaN(shiftStartObj.getTime()) || isNaN(shiftEndObj.getTime())) return false;
 
-  let currentDayIter = new Date(shiftStartObj);
-  currentDayIter.setHours(0, 0, 0, 0); 
+  let currentDayIterator = new Date(shiftStartObj); // Renamed to avoid confusion
+  currentDayIterator.setHours(0, 0, 0, 0); 
 
-  const finalDayOfShift = new Date(shiftEndObj);
+  const finalDayOfShiftDate = new Date(shiftEndObj); // Renamed
   if (shiftEndObj.getHours() === 0 && shiftEndObj.getMinutes() === 0 && shiftStartObj.toDateString() !== shiftEndObj.toDateString()) {
-    finalDayOfShift.setDate(finalDayOfShift.getDate() - 1);
+    finalDayOfShiftDate.setDate(finalDayOfShiftDate.getDate() - 1);
   }
-  finalDayOfShift.setHours(23, 59, 59, 999); 
+  finalDayOfShiftDate.setHours(23, 59, 59, 999); 
 
-  while (currentDayIter.getTime() <= finalDayOfShift.getTime()) {
-    const dayOfWeek = currentDayIter.getDay(); 
+  while (currentDayIterator.getTime() <= finalDayOfShiftDate.getTime()) {
+    const dayOfWeek = currentDayIterator.getDay(); 
     if (dayOfWeek === 0 || dayOfWeek === 6) { 
-      const weekendCalendarDayStart = new Date(currentDayIter); 
+      const weekendCalendarDayStart = new Date(currentDayIterator); 
       weekendCalendarDayStart.setHours(0, 0, 0, 0);
-      const weekendCalendarDayEnd = new Date(currentDayIter);
+      const weekendCalendarDayEnd = new Date(currentDayIterator);
       weekendCalendarDayEnd.setHours(23, 59, 59, 999);
 
       if (Math.max(shiftStartObj.getTime(), weekendCalendarDayStart.getTime()) < Math.min(shiftEndObj.getTime(), weekendCalendarDayEnd.getTime())) {
         return true; 
       }
     }
-    currentDayIter.setDate(currentDayIter.getDate() + 1);
+    currentDayIterator.setDate(currentDayIterator.getDate() + 1);
   }
   return false;
 };
@@ -97,6 +97,16 @@ const CATEGORIES = {
     WEEKEND_WORK: 'Weekend Work',
     BREAK_ENTITLEMENTS: 'Break Entitlements',
 };
+
+const CATEGORY_ORDER = [
+    CATEGORIES.AVERAGE_HOURS,
+    CATEGORIES.MAX_HOURS_SHIFTS,
+    CATEGORIES.ON_CALL,
+    CATEGORIES.REST,
+    CATEGORIES.WEEKEND_WORK,
+    CATEGORIES.BREAK_ENTITLEMENTS,
+    'Other' // For any uncategorized items
+];
 
 // --- Limit Definitions ---
 const WORKING_LIMITS = [
@@ -825,8 +835,8 @@ const WORKING_LIMITS = [
   },
   {
     id: 'weekendFrequency',
-    name: 'Actual Calendar Weekend Work Frequency', // Renamed
-    description: 'Work no more than 1 in 3 actual calendar weekends. Max 1 in 2. Considers rota start date.', // Updated description
+    name: 'Actual Calendar Weekend Work Frequency', 
+    description: 'Work no more than 1 in 3 actual calendar weekends. Max 1 in 2. Considers rota start date.',
     pdfReference: 'Schedule 3, Para 16 & 18',
     category: CATEGORIES.WEEKEND_WORK,
     check: (shifts: ProcessedShift[], scheduleWeeks: number) => {
@@ -835,12 +845,26 @@ const WORKING_LIMITS = [
         const weekendsWorked = new Set<string>();
         shifts.forEach(shift => {
             if (isWeekendShift(shift)) {
-                const shiftActualStart = new Date(shift.start);
-                const dayOfWeekOfShiftStart = shiftActualStart.getDay(); 
+                const shiftActualStartDate = new Date(shift.start); // Renamed
+                const dayOfWeekOfShiftActualStart = shiftActualStartDate.getDay(); // Renamed
     
-                const saturdayKeyDate = new Date(shiftActualStart);
+                const saturdayKeyDate = new Date(shiftActualStartDate);
                 saturdayKeyDate.setHours(0, 0, 0, 0); 
-                saturdayKeyDate.setDate(saturdayKeyDate.getDate() - dayOfWeekOfShiftStart + (dayOfWeekOfShiftStart === 0 ? -1 : 6)); // Corrected: 0 (Sun) -> -1+6 = 5 (Sat), 6 (Sat) -> -6+6=0 (Sat) -> This formula is fine.
+                // Corrected logic for finding the Saturday of the week the shift's start date is in.
+                // getDay() returns 0 for Sunday, 1 for Monday, ..., 6 for Saturday.
+                // We want to find the date of the Saturday of that week.
+                // If shift starts on Sunday (0), Saturday was yesterday (-1 day).
+                // If shift starts on Monday (1), Saturday is 5 days away (+5 days).
+                // If shift starts on Saturday (6), Saturday is today (0 days).
+                // Formula: date - dayOfWeek + 6 (if dayOfWeek is Sunday, effectively date - 0 + 6 = date of next Saturday)
+                // Correct: date.getDate() - dayOfWeek (of Sunday) + 6
+                // If shift starts on Sunday (dayOfWeek = 0), we go back 1 day to get to Sat.
+                // If shift starts on Saturday (dayOfWeek = 6), it's the same day.
+                // More robust: Find Monday, then add 5 days.
+                // Or: current day of week. If Sun (0), diff to Sat is -1. If Mon(1), diff is +5... If Sat(6), diff is 0.
+                // Simpler for current logic: current date - (dayOfWeek + 1 % 7) to get previous Sunday, then add 6 for Saturday.
+                // OR current_date - day_of_week + 6 (adjust for Sunday being 0)
+                 saturdayKeyDate.setDate(shiftActualStartDate.getDate() - dayOfWeekOfShiftActualStart + (dayOfWeekOfShiftActualStart === 0 ? -1 : 6) ); // Original logic was nearly right, adjusted for Sunday.
                 
                 weekendsWorked.add(saturdayKeyDate.toISOString().split('T')[0]);
             }
@@ -952,6 +976,7 @@ const WORKING_LIMITS = [
 
 
 // Schema for RotaInput validation (simplified, as full validation is complex)
+// This now matches RotaProcessingInput
 const rotaInputSchema = z.object({
   scheduleMeta: z.object({
     wtrOptOut: z.boolean(),
@@ -1033,7 +1058,7 @@ function checkPatternWeekendFrequency(
 }
 
 
-export async function processRota(data: RotaInput): Promise<ProcessedRotaResult | { error: string; fieldErrors?: z.ZodIssue[]; }> {
+export async function processRota(data: RotaProcessingInput): Promise<ProcessedRotaResult | { error: string; fieldErrors?: z.ZodIssue[]; }> {
   const validation = rotaInputSchema.safeParse(data);
   if (!validation.success) {
     return {
@@ -1145,3 +1170,4 @@ export async function processRota(data: RotaInput): Promise<ProcessedRotaResult 
     estimatedSalary: 0, 
   };
 }
+
