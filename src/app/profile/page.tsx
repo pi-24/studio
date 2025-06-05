@@ -153,7 +153,7 @@ export default function ProfilePage() {
     if (user) {
       const profileUpdateData: Partial<UserProfileData> = {
         ...data, 
-        isProfileComplete: true,
+        isProfileComplete: true, // Ensure this remains true or is set if they are editing
       };
       updateUserProfile(profileUpdateData);
       toast({ title: "Profile Updated", description: "Your changes have been saved." });
@@ -215,7 +215,7 @@ export default function ProfilePage() {
               <div>
                 <Label htmlFor="grade">Grade</Label>
                 <Controller name="grade" control={control} render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
                       <SelectTrigger id="grade"><SelectValue placeholder="Select grade" /></SelectTrigger>
                       <SelectContent>{userGradeOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
                     </Select> )}
@@ -225,7 +225,7 @@ export default function ProfilePage() {
               <div>
                 <Label htmlFor="region">Region of Work (UK)</Label>
                 <Controller name="region" control={control} render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
                       <SelectTrigger id="region"><SelectValue placeholder="Select region" /></SelectTrigger>
                       <SelectContent>{ukRegionOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
                     </Select> )}
