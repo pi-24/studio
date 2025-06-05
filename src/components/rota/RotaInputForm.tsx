@@ -10,15 +10,16 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { CalendarDays, Send, XCircle, AlertCircle as AlertIconLucide, Edit } from 'lucide-react';
+import { CalendarDays, Send, XCircle, AlertCircle as AlertIconLucide, Edit, Save } from 'lucide-react';
 import type { RotaInput, ProcessedRotaResult, ShiftDefinition, ScheduleMetadata, RotaGridInput } from '@/types';
 import React, { useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import Link from 'next/link';
 
-// Schema for the rota grid part of the form
+const OFF_VALUE = "_OFF_"; // Special value for the "OFF" SelectItem
+
 const rotaGridFormSchema = z.object({
-  rotaGrid: z.record(z.string()), // Dynamic keys like week_0_day_0
+  rotaGrid: z.record(z.string()),
 });
 
 type RotaGridFormValues = z.infer<typeof rotaGridFormSchema>;
@@ -26,11 +27,11 @@ type RotaGridFormValues = z.infer<typeof rotaGridFormSchema>;
 interface RotaInputFormProps {
   scheduleMeta: ScheduleMetadata; 
   shiftDefinitions: ShiftDefinition[];
-  initialRotaGrid?: RotaGridInput; // For pre-filling the grid
-  onProcessRota: (fullRotaInput: RotaInput) => Promise<void>; // Expects the full input
+  initialRotaGrid?: RotaGridInput;
+  onProcessRota: (fullRotaInput: RotaInput) => Promise<void>;
   isProcessing: boolean;
   setIsProcessing: (isProcessing: boolean) => void;
-  isEditing: boolean; // New prop to control edit mode
+  isEditing: boolean;
 }
 
 export default function RotaInputForm({ 
@@ -40,11 +41,11 @@ export default function RotaInputForm({
     onProcessRota, 
     isProcessing, 
     setIsProcessing,
-    isEditing // Destructure new prop
+    isEditing
 }: RotaInputFormProps) {
   const { toast } = useToast();
 
-  const { control, handleSubmit, reset, formState: { errors: formErrors }, setError: setFormError } = useForm<RotaGridFormValues>({
+  const { control, handleSubmit, reset, formState: { errors: formErrors, isDirty } } = useForm<RotaGridFormValues>({
     resolver: zodResolver(rotaGridFormSchema),
     defaultValues: {
       rotaGrid: initialRotaGrid || {},
@@ -52,7 +53,16 @@ export default function RotaInputForm({
   });
 
   useEffect(() => {
-    reset({ rotaGrid: initialRotaGrid || {} });
+    // Pre-process initialRotaGrid: map empty strings to OFF_VALUE for display
+    const displayGrid = { ...initialRotaGrid };
+    if (initialRotaGrid) {
+        for (const key in initialRotaGrid) {
+            if (initialRotaGrid[key] === "") {
+                displayGrid[key] = OFF_VALUE;
+            }
+        }
+    }
+    reset({ rotaGrid: displayGrid });
   }, [initialRotaGrid, reset]);
 
 
@@ -62,23 +72,48 @@ export default function RotaInputForm({
       return;
     }
 
+    // Convert OFF_VALUE back to empty string for processing/saving
+    const processedGrid: RotaGridInput = {};
+    for (const key in data.rotaGrid) {
+        processedGrid[key] = data.rotaGrid[key] === OFF_VALUE ? "" : data.rotaGrid[key];
+    }
+
     const fullRotaInput: RotaInput = {
       scheduleMeta,
       shiftDefinitions,
-      rotaGrid: data.rotaGrid,
+      rotaGrid: processedGrid,
     };
-    await onProcessRota(fullRotaInput); // Parent handles setting results and errors
+    await onProcessRota(fullRotaInput);
   };
   
   const handleClearGrid = () => {
-    reset({ rotaGrid: {} });
+    // Reset form fields to OFF_VALUE for display
+    const clearedDisplayGrid: RotaGridInput = {};
+     if(scheduleMeta) {
+        for(let w=0; w < scheduleMeta.scheduleTotalWeeks; w++) {
+            for(let d=0; d<7; d++) {
+                clearedDisplayGrid[`week_${w}_day_${d}`] = OFF_VALUE;
+            }
+        }
+    }
+    reset({ rotaGrid: clearedDisplayGrid });
+
+    // Prepare cleared data for processing (empty strings for OFF)
+    const clearedProcessingGrid: RotaGridInput = {};
+     if(scheduleMeta) {
+        for(let w=0; w < scheduleMeta.scheduleTotalWeeks; w++) {
+            for(let d=0; d<7; d++) {
+                clearedProcessingGrid[`week_${w}_day_${d}`] = "";
+            }
+        }
+    }
     const clearedFullRotaInput: RotaInput = {
         scheduleMeta,
         shiftDefinitions,
-        rotaGrid: {}
+        rotaGrid: clearedProcessingGrid
     };
     onProcessRota(clearedFullRotaInput); 
-    toast({ title: "Rota Grid Cleared", description: "Your rota inputs have been reset. Click 'Calculate & Check' to re-process." });
+    toast({ title: "Rota Grid Cleared", description: "Your rota inputs have been reset. Click 'Save Rota and Check Compliance' to save and re-process." });
   };
   
   const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -96,7 +131,7 @@ export default function RotaInputForm({
 
   return (
       <form onSubmit={handleSubmit(onSubmitGrid)}>
-        <CardContent className="space-y-6 pt-6"> {/* Added pt-6 for spacing from header */}
+        <CardContent className="space-y-6 pt-6">
           {shiftDefinitions.length === 0 || shiftDefinitions.every(d => !d.dutyCode) ? (
                 <div className="p-4 text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded-md">
                     <p className="flex items-center"><AlertIconLucide size={18} className="mr-2"/>No shift types defined. Please <Link href="/profile" className="font-semibold underline hover:text-amber-700 dark:hover:text-amber-400">add shift definitions in your profile</Link>.</p>
@@ -122,16 +157,18 @@ export default function RotaInputForm({
                                             render={({ field }) => (
                                                 <Select 
                                                     onValueChange={field.onChange} 
-                                                    value={field.value || ""}
-                                                    disabled={!isEditing} // Disable select if not in edit mode
+                                                    value={field.value || OFF_VALUE} // Default to OFF_VALUE if field.value is empty or undefined
+                                                    disabled={!isEditing}
                                                 >
                                                     <SelectTrigger 
                                                         className="w-full min-w-[100px] sm:min-w-[120px] h-9 text-xs"
-                                                        disabled={!isEditing} // Also disable trigger visually
+                                                        disabled={!isEditing}
                                                     >
-                                                        <SelectValue placeholder="OFF" />
+                                                        {/* Display "OFF" if current value is OFF_VALUE, otherwise SelectValue handles it */}
+                                                        {field.value === OFF_VALUE ? "OFF" : <SelectValue placeholder="OFF" />}
                                                     </SelectTrigger>
                                                     <SelectContent>
+                                                        <SelectItem value={OFF_VALUE}>OFF</SelectItem>
                                                         {shiftDefinitions.filter(d => d.dutyCode).map(def => (
                                                             <SelectItem key={def.id} value={def.dutyCode}>
                                                                 {def.dutyCode} - {def.name.substring(0,12)}{def.name.length > 12 ? '...' : ''}
@@ -172,8 +209,8 @@ export default function RotaInputForm({
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
-                <Button type="submit" className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isProcessing || shiftDefinitions.length === 0 || !isEditing}>
-                    <Send className="mr-2 h-4 w-4" /> {isProcessing ? 'Processing...' : 'Calculate & Check Compliance'}
+                <Button type="submit" className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isProcessing || shiftDefinitions.length === 0 || !isEditing || !isDirty}>
+                    <Save className="mr-2 h-4 w-4" /> {isProcessing ? 'Processing...' : 'Save Rota and Check Compliance'}
                 </Button>
             </CardFooter>
         )}
