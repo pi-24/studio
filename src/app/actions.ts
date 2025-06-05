@@ -57,10 +57,10 @@ const isWeekendShift = (shift: ProcessedShift): boolean => {
 
   if (isNaN(shiftStartObj.getTime()) || isNaN(shiftEndObj.getTime())) return false;
 
-  let currentDayIterator = new Date(shiftStartObj); // Renamed to avoid confusion
+  let currentDayIterator = new Date(shiftStartObj); 
   currentDayIterator.setHours(0, 0, 0, 0); 
 
-  const finalDayOfShiftDate = new Date(shiftEndObj); // Renamed
+  const finalDayOfShiftDate = new Date(shiftEndObj); 
   if (shiftEndObj.getHours() === 0 && shiftEndObj.getMinutes() === 0 && shiftStartObj.toDateString() !== shiftEndObj.toDateString()) {
     finalDayOfShiftDate.setDate(finalDayOfShiftDate.getDate() - 1);
   }
@@ -830,79 +830,6 @@ const WORKING_LIMITS = [
             isViolated, userValue: isViolated ? parseFloat(minRest.toFixed(2)) : (minRest === Infinity ? 'N/A' : parseFloat(minRest.toFixed(2))),
             limitValue: 11, difference: isViolated ? `${parseFloat((11 - minRest).toFixed(2))} hours short` : 'Met',
             details: isViolated ? violationDetail : `Shortest rest period: ${minRest === Infinity ? 'N/A (or only one shift)' : minRest.toFixed(2)} hrs. Limit: 11 hrs.`,
-        };
-    },
-  },
-  {
-    id: 'weekendFrequency',
-    name: 'Actual Calendar Weekend Work Frequency', 
-    description: 'Work no more than 1 in 3 actual calendar weekends. Max 1 in 2. Considers rota start date.',
-    pdfReference: 'Schedule 3, Para 16 & 18',
-    category: CATEGORIES.WEEKEND_WORK,
-    check: (shifts: ProcessedShift[], scheduleWeeks: number) => {
-        if (!shifts || !shifts.length || !scheduleWeeks || scheduleWeeks < 1) return { isViolated: false, userValue: 'N/A', limitValue: '1 in 3 (max 1 in 2)', difference: 'N/A', details: 'Not enough data for actual weekend check.' };
-        
-        const weekendsWorked = new Set<string>();
-        shifts.forEach(shift => {
-            if (isWeekendShift(shift)) {
-                const shiftActualStartDate = new Date(shift.start); // Renamed
-                const dayOfWeekOfShiftActualStart = shiftActualStartDate.getDay(); // Renamed
-    
-                const saturdayKeyDate = new Date(shiftActualStartDate);
-                saturdayKeyDate.setHours(0, 0, 0, 0); 
-                // Corrected logic for finding the Saturday of the week the shift's start date is in.
-                // getDay() returns 0 for Sunday, 1 for Monday, ..., 6 for Saturday.
-                // We want to find the date of the Saturday of that week.
-                // If shift starts on Sunday (0), Saturday was yesterday (-1 day).
-                // If shift starts on Monday (1), Saturday is 5 days away (+5 days).
-                // If shift starts on Saturday (6), Saturday is today (0 days).
-                // Formula: date - dayOfWeek + 6 (if dayOfWeek is Sunday, effectively date - 0 + 6 = date of next Saturday)
-                // Correct: date.getDate() - dayOfWeek (of Sunday) + 6
-                // If shift starts on Sunday (dayOfWeek = 0), we go back 1 day to get to Sat.
-                // If shift starts on Saturday (dayOfWeek = 6), it's the same day.
-                // More robust: Find Monday, then add 5 days.
-                // Or: current day of week. If Sun (0), diff to Sat is -1. If Mon(1), diff is +5... If Sat(6), diff is 0.
-                // Simpler for current logic: current date - (dayOfWeek + 1 % 7) to get previous Sunday, then add 6 for Saturday.
-                // OR current_date - day_of_week + 6 (adjust for Sunday being 0)
-                 saturdayKeyDate.setDate(shiftActualStartDate.getDate() - dayOfWeekOfShiftActualStart + (dayOfWeekOfShiftActualStart === 0 ? -1 : 6) ); // Original logic was nearly right, adjusted for Sunday.
-                
-                weekendsWorked.add(saturdayKeyDate.toISOString().split('T')[0]);
-            }
-        });
-        
-        const numWeekendsWorked = weekendsWorked.size;
-        const totalWeekendsInSchedule = scheduleWeeks; 
-        
-        let frequencyText = 'N/A';
-        let calculatedFrequencyRatio = Infinity; 
-
-        if (numWeekendsWorked > 0 && totalWeekendsInSchedule > 0) {
-          calculatedFrequencyRatio = totalWeekendsInSchedule / numWeekendsWorked;
-          frequencyText = `1 in ${calculatedFrequencyRatio.toFixed(1)}`;
-        } else if (numWeekendsWorked === 0) {
-          frequencyText = '0 actual weekends worked';
-        }
-
-        const violates1in3Guideline = numWeekendsWorked > 0 && calculatedFrequencyRatio < 3;
-        const violates1in2AbsoluteMax = numWeekendsWorked > 0 && calculatedFrequencyRatio < 2;
-        
-        const isActuallyViolated = violates1in3Guideline; 
-        let violationSummary = '';
-
-        if (violates1in2AbsoluteMax) {
-            violationSummary = 'Exceeds 1 in 2 limit (actual weekends).';
-        } else if (violates1in3Guideline) {
-            violationSummary = 'Exceeds 1 in 3 guidance (actual weekends).';
-        }
-        
-        const details = `Worked ${numWeekendsWorked} actual calendar weekends in ${totalWeekendsInSchedule}-week cycle (${frequencyText}). This check is based on rota start date.`;
-        
-        return {
-            isViolated: isActuallyViolated,
-            userValue: frequencyText, 
-            limitValue: '1 in 3 (max 1 in 2)',
-            difference: violationSummary || (numWeekendsWorked === 0 ? 'No actual weekends worked' : 'Met'), 
-            details,
         };
     },
   },
