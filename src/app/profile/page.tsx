@@ -10,16 +10,15 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { UserCircle, Mail, LogOut, Briefcase, MapPin, Percent, Landmark, ShieldCheck, Settings2, Trash2, PlusCircle, Save } from 'lucide-react';
+import { UserCircle, Mail, LogOut, Briefcase, MapPin, Percent, Landmark, ShieldCheck, Settings2, Trash2, PlusCircle, Save, CalendarDays, ExternalLink } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label'; // Using ShadCN Label
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { UserProfileData, UserGrade, UKRegion, ShiftDefinition as ShiftDefinitionType, ScheduleMetadata as ScheduleMetadataType } from '@/types'; // Assuming types are defined here
+import { UserProfileData, UserGrade, UKRegion, ShiftDefinition as ShiftDefinitionType, ScheduleMetadata as ScheduleMetadataType, RotaGridInput } from '@/types';
 import { useToast } from "@/hooks/use-toast";
 
-// Schemas for validation (mirroring setup page)
 const userGradeOptions: UserGrade[] = ['F1', 'F2', 'CT1', 'CT2', 'CT3+', 'ST1', 'ST2', 'ST3+', 'SpecialtyDoctor', 'Consultant', 'Other'];
 const ukRegionOptions: UKRegion[] = ['London', 'SouthEast', 'SouthWest', 'EastOfEngland', 'Midlands', 'NorthEastAndYorkshire', 'NorthWest', 'Scotland', 'Wales', 'NorthernIreland', 'Other'];
 
@@ -41,6 +40,8 @@ const scheduleMetadataSchema = z.object({
   hoursInNormalDay: z.number().min(1).max(24),
 });
 
+const rotaGridSchema = z.record(z.string());
+
 const profileEditSchema = z.object({
   grade: z.enum(userGradeOptions).optional(),
   region: z.enum(ukRegionOptions).optional(),
@@ -54,6 +55,7 @@ const profileEditSchema = z.object({
       message: 'Duty Codes must be unique',
       path: ['shiftDefinitions'] 
     }).optional(),
+  rotaGrid: rotaGridSchema.optional(), // Added for completeness, though not directly editable here
 });
 
 type ProfileEditFormValues = z.infer<typeof profileEditSchema>;
@@ -77,6 +79,7 @@ const calculateShiftDurationString = (startTimeStr: string, finishTimeStr: strin
     return `${durationH}h ${durationM}m`;
 };
 
+const daysOfWeekGrid = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export default function ProfilePage() {
   const { user, logout, updateUserProfile, loading: authLoading } = useAuth();
@@ -85,7 +88,7 @@ export default function ProfilePage() {
 
   const { control, handleSubmit, register, formState: { errors, isSubmitting, isDirty }, reset, watch, setValue } = useForm<ProfileEditFormValues>({
     resolver: zodResolver(profileEditSchema),
-    defaultValues: {},
+    defaultValues: {}, // Default values will be set by useEffect based on user
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -94,6 +97,13 @@ export default function ProfilePage() {
   });
 
   const watchedShiftDefinitions = watch('shiftDefinitions');
+
+  const defaultScheduleMetaValues: ScheduleMetadataType = {
+     wtrOptOut: false, scheduleTotalWeeks: 4, scheduleStartDate: new Date().toISOString().split('T')[0], annualLeaveEntitlement: 27, hoursInNormalDay: 8
+  };
+  const defaultShiftDefinitionsValues: ShiftDefinitionType[] = [
+    { id: crypto.randomUUID(), dutyCode: 'S1', name: 'Standard Day', type: 'normal', startTime: '09:00', finishTime: '17:00', durationStr: '8h 0m' }
+  ];
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -106,9 +116,9 @@ export default function ProfilePage() {
         hasStudentLoan: user.hasStudentLoan || false,
         hasPostgraduateLoan: user.hasPostgraduateLoan || false,
         nhsPensionOptIn: user.nhsPensionOptIn === undefined ? true : user.nhsPensionOptIn,
-        scheduleMeta: user.scheduleMeta || { wtrOptOut: false, scheduleTotalWeeks: 4, scheduleStartDate: new Date().toISOString().split('T')[0], annualLeaveEntitlement: 27, hoursInNormalDay: 8 },
-        shiftDefinitions: user.shiftDefinitions && user.shiftDefinitions.length > 0 ? user.shiftDefinitions : 
-          [{ id: crypto.randomUUID(), dutyCode: 'S1', name: 'Standard Day', type: 'normal', startTime: '09:00', finishTime: '17:00', durationStr: '8h 0m' }],
+        scheduleMeta: user.scheduleMeta || defaultScheduleMetaValues,
+        shiftDefinitions: user.shiftDefinitions && user.shiftDefinitions.length > 0 ? user.shiftDefinitions : defaultShiftDefinitionsValues,
+        rotaGrid: user.rotaGrid || {}, // For display, not directly edited here
       });
     }
   }, [user, authLoading, router, reset]);
@@ -116,7 +126,7 @@ export default function ProfilePage() {
   useEffect(() => {
     if (watchedShiftDefinitions) {
         watchedShiftDefinitions.forEach((def, index) => {
-          if(def) { // Check if def is not undefined
+          if(def) {
             const newDuration = calculateShiftDurationString(def.startTime, def.finishTime);
             if (def.durationStr !== newDuration) {
               setValue(`shiftDefinitions.${index}.durationStr`, newDuration, { shouldValidate: false, shouldDirty: true });
@@ -129,13 +139,17 @@ export default function ProfilePage() {
 
   const onSubmit: SubmitHandler<ProfileEditFormValues> = (data) => {
     if (user) {
+      // Exclude rotaGrid from the direct update data as it's not edited on this form directly.
+      // It's managed via RotaChecker or ProfileSetup.
+      const { rotaGrid, ...editableProfileData } = data;
+      
       const profileUpdateData: Partial<UserProfileData> = {
-        ...data,
-        // isProfileComplete will remain true or as is, not changed here
+        ...editableProfileData,
+        isProfileComplete: true, // Ensure profile is marked complete if edited
       };
       updateUserProfile(profileUpdateData);
       toast({ title: "Profile Updated", description: "Your changes have been saved." });
-      reset(data); // Reset form with new default values to clear isDirty state
+      reset(editableProfileData as ProfileEditFormValues); // Reset form with new default values to clear isDirty state
     }
   };
 
@@ -159,6 +173,11 @@ export default function ProfilePage() {
   }
 
   const userInitial = user.email ? user.email.charAt(0).toUpperCase() : '?';
+  const shiftDefMap = user.shiftDefinitions?.reduce((acc, def) => {
+    acc[def.dutyCode] = def.name;
+    return acc;
+  }, {} as Record<string, string>) || {};
+
 
   return (
     <div className="flex justify-center py-8">
@@ -297,6 +316,49 @@ export default function ProfilePage() {
               ))}
               <Button type="button" variant="outline" onClick={addShiftDefinition}><PlusCircle className="mr-2 h-4 w-4" /> Add Shift Type</Button>
             </section>
+
+             {/* Current Rota Schedule Display */}
+            <section className="space-y-4 border-t pt-6">
+                <div className="flex justify-between items-center">
+                    <h3 className="text-xl font-semibold text-primary flex items-center gap-2"><CalendarDays />Current Rota Schedule</h3>
+                    <Button variant="outline" size="sm" asChild>
+                        <Link href="/rota-checker">
+                            <Edit className="mr-2 h-4 w-4" /> Edit Rota
+                        </Link>
+                    </Button>
+                </div>
+                {(!user.rotaGrid || Object.keys(user.rotaGrid).length === 0) ? (
+                    <p className="text-muted-foreground">No rota schedule entered yet. You can input your rota in the Rota Compliance Checker tool.</p>
+                ) : (
+                    <div className="overflow-x-auto custom-scrollbar border rounded-lg p-2 bg-muted/20">
+                        <table className="min-w-full text-xs">
+                            <thead className="bg-muted/50">
+                                <tr>
+                                    <th className="px-1.5 py-1 text-left font-medium">Week</th>
+                                    {daysOfWeekGrid.map(day => <th key={day} className="px-1.5 py-1 text-center font-medium">{day}</th>)}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {Array.from({ length: user.scheduleMeta?.scheduleTotalWeeks || 0 }, (_, weekIndex) => (
+                                    <tr key={weekIndex} className="border-b border-border last:border-b-0">
+                                        <td className="px-1.5 py-1 font-medium">W{weekIndex + 1}</td>
+                                        {daysOfWeekGrid.map((_, dayIndex) => {
+                                            const dutyCode = user.rotaGrid?.[`week_${weekIndex}_day_${dayIndex}`];
+                                            const shiftName = dutyCode ? (shiftDefMap[dutyCode] || dutyCode) : 'OFF';
+                                            return (
+                                                <td key={dayIndex} className="px-1.5 py-1 text-center whitespace-nowrap" title={shiftName !== dutyCode && dutyCode ? shiftName : undefined}>
+                                                    {dutyCode ? dutyCode : <span className="text-muted-foreground/70">OFF</span>}
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </section>
+
 
           </CardContent>
           <CardFooter className="flex flex-col sm:flex-row justify-between items-center pt-6 border-t mt-8">

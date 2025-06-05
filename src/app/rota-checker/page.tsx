@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import RotaInputForm from '@/components/rota/RotaInputForm';
 import ComplianceReport from '@/components/rota/ComplianceReport';
-import type { ProcessedRotaResult, RotaInput, UserProfileData, RotaGridInput } from '@/types';
+import type { ProcessedRotaResult, RotaInput, UserProfileData, RotaGridInput, ScheduleMetadata, ShiftDefinition } from '@/types';
 import { processRota } from '@/app/actions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,13 +23,23 @@ export default function RotaCheckerPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [initialLoadProcessing, setInitialLoadProcessing] = useState(true);
 
-  const handleProcessRota = useCallback(async (currentRotaInput: RotaInput) => {
-    if (!user || !currentRotaInput.scheduleMeta || !currentRotaInput.shiftDefinitions) {
+
+  // This function is called by RotaInputForm when the user submits changes to the grid
+  const handleRotaGridSubmit = useCallback(async (submittedRotaGrid: RotaGridInput) => {
+    if (!user || !user.scheduleMeta || !user.shiftDefinitions) {
       setRotaResult({ error: "User profile data is incomplete. Cannot process rota." });
+      setIsProcessing(false); // Ensure processing state is reset
       return;
     }
     setIsProcessing(true);
-    const result = await processRota(currentRotaInput);
+
+    const fullRotaInput: RotaInput = {
+        scheduleMeta: user.scheduleMeta,
+        shiftDefinitions: user.shiftDefinitions,
+        rotaGrid: submittedRotaGrid,
+    };
+
+    const result = await processRota(fullRotaInput);
     setRotaResult(result);
     setIsProcessing(false);
 
@@ -37,41 +47,56 @@ export default function RotaCheckerPage() {
       toast({ title: "Processing Error", description: result.error, variant: "destructive" });
     } else {
       toast({ title: "Rota Processed", description: "Compliance checks updated." });
-      // Save the processed rota grid back to user profile
-      if (user && currentRotaInput.rotaGrid) {
-          const updatedProfileData: Partial<UserProfileData> = {
-            rotaGrid: currentRotaInput.rotaGrid
-          };
-          updateUserProfile(updatedProfileData);
+      // Only update profile if the submitted grid is different from what's currently stored for the user
+      const currentGridString = user.rotaGrid ? JSON.stringify(user.rotaGrid) : "{}";
+      const submittedGridString = JSON.stringify(submittedRotaGrid);
+
+      if (currentGridString !== submittedGridString) {
+        updateUserProfile({ rotaGrid: submittedRotaGrid });
       }
     }
   }, [user, toast, updateUserProfile]);
 
 
+  // Effect for initial load processing when the page mounts or critical user data changes
   useEffect(() => {
-    if (!authLoading && user && user.isProfileComplete && user.scheduleMeta && user.shiftDefinitions && user.rotaGrid) {
-      if (Object.keys(user.rotaGrid).length > 0) { // Only auto-process if rota grid is not empty
-        const initialFullRotaInput: RotaInput = {
-          scheduleMeta: user.scheduleMeta,
-          shiftDefinitions: user.shiftDefinitions,
-          rotaGrid: user.rotaGrid,
+    if (!authLoading && user && user.isProfileComplete && user.scheduleMeta && user.shiftDefinitions) {
+      if (user.rotaGrid && Object.keys(user.rotaGrid).length > 0) {
+        const processInitialData = async () => {
+          setIsProcessing(true); // Use general isProcessing here for consistency
+          const initialFullRotaInput: RotaInput = {
+            scheduleMeta: user.scheduleMeta as ScheduleMetadata, // Cast as non-null
+            shiftDefinitions: user.shiftDefinitions as ShiftDefinition[], // Cast
+            rotaGrid: user.rotaGrid as RotaGridInput, // Cast
+          };
+          const result = await processRota(initialFullRotaInput);
+          setRotaResult(result);
+          setIsProcessing(false);
+          setInitialLoadProcessing(false);
+          // No toast for initial load to avoid annoyance, or a very subtle one
+          // if ('error' in result) {
+          //   toast({ title: "Initial Rota Load Error", description: result.error, variant: "destructive" });
+          // }
         };
-        handleProcessRota(initialFullRotaInput).finally(() => setInitialLoadProcessing(false));
+        processInitialData();
       } else {
         setInitialLoadProcessing(false);
         setRotaResult(null); // Ensure report is cleared if grid is empty
       }
     } else if (!authLoading && (!user || !user.isProfileComplete)) {
       router.push('/profile/setup');
-    } else if (!authLoading) {
-      // Handle case where user profile is complete but scheduleMeta or shiftDefinitions might be missing (shouldn't happen with proper setup flow)
+    } else if (!authLoading && user && (!user.scheduleMeta || !user.shiftDefinitions)) {
       setInitialLoadProcessing(false);
-      if (!user?.scheduleMeta || !user?.shiftDefinitions) {
-          toast({title: "Configuration Error", description: "Rota settings or shift types are missing. Please update your profile.", variant: "destructive"});
-          setRotaResult({ error: "Rota settings or shift types are missing. Please update your profile."});
-      }
+      toast({title: "Configuration Error", description: "Rota settings or shift types are missing. Please update your profile.", variant: "destructive"});
+      setRotaResult({ error: "Rota settings or shift types are missing. Please update your profile."});
+    } else if (authLoading) {
+      // Still loading, do nothing yet, wait for auth state to resolve
+    } else {
+      // Catch-all for other states, e.g. user is null but auth not loading (should be caught by login redirect)
+      setInitialLoadProcessing(false);
     }
-  }, [user, authLoading, router, handleProcessRota, toast]);
+  }, [user, authLoading, router, toast]); // Dependencies for initial load
+
 
   if (authLoading || initialLoadProcessing) {
     return (
@@ -82,12 +107,12 @@ export default function RotaCheckerPage() {
     );
   }
 
-  if (!user) { // Should be caught by AuthContext, but good for safety
-    return <p>Redirecting to login...</p>;
+  if (!user) {
+    return <p>Redirecting to login...</p>; // Should be handled by AuthProvider
   }
 
-  if (!user.isProfileComplete) { // Should be caught by AuthContext
-    return <p>Redirecting to profile setup...</p>;
+  if (!user.isProfileComplete) {
+    return <p>Redirecting to profile setup...</p>; // Should be handled by AuthProvider
   }
   
   if (!user.scheduleMeta || !user.shiftDefinitions) {
@@ -116,9 +141,9 @@ export default function RotaCheckerPage() {
         scheduleMeta={user.scheduleMeta}
         shiftDefinitions={user.shiftDefinitions}
         initialRotaGrid={user.rotaGrid || {}}
-        onProcessRota={handleProcessRota} // RotaInputForm will call this with the full RotaInput object
+        onProcessRota={handleRotaGridSubmit} 
         isProcessing={isProcessing}
-        setIsProcessing={setIsProcessing} // Pass down to RotaInputForm if it manages its own processing state for UI
+        setIsProcessing={setIsProcessing} 
       />
       <ComplianceReport result={rotaResult} isProcessing={isProcessing} />
     </div>

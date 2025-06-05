@@ -1,8 +1,8 @@
 
 "use client";
 
-import type { User, UserProfileData, RotaGridInput } from '@/types';
-import React, { createContext, useState, useEffect, ReactNode } from 'react';
+import type { User, UserProfileData, RotaGridInput, ScheduleMetadata, ShiftDefinition } from '@/types';
+import React, { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 
 interface AuthContextType {
@@ -16,7 +16,7 @@ interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const defaultScheduleMeta = {
+const defaultScheduleMeta: ScheduleMetadata = {
   wtrOptOut: false,
   scheduleTotalWeeks: 4,
   scheduleStartDate: new Date().toISOString().split('T')[0],
@@ -24,7 +24,7 @@ const defaultScheduleMeta = {
   hoursInNormalDay: 8,
 };
 
-const defaultShiftDefinitions = [{ id: crypto.randomUUID(), dutyCode: 'S1', name: 'Standard Day', type: 'normal' as 'normal' | 'on-call', startTime: '09:00', finishTime: '17:00', durationStr: '8h 0m' }];
+const defaultShiftDefinitions: ShiftDefinition[] = [{ id: crypto.randomUUID(), dutyCode: 'S1', name: 'Standard Day', type: 'normal' as 'normal' | 'on-call', startTime: '09:00', finishTime: '17:00', durationStr: '8h 0m' }];
 
 const defaultRotaGrid: RotaGridInput = {};
 
@@ -38,16 +38,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const storedUser = localStorage.getItem('rotaCalcUser');
       if (storedUser) {
-        const parsedUser = JSON.parse(storedUser);
+        const parsedUser: User = JSON.parse(storedUser);
         // Ensure essential defaults if profile is incomplete from an older version
         if (!parsedUser.scheduleMeta) {
-          parsedUser.scheduleMeta = defaultScheduleMeta;
+          parsedUser.scheduleMeta = { ...defaultScheduleMeta };
         }
-        if (!parsedUser.shiftDefinitions) {
-          parsedUser.shiftDefinitions = defaultShiftDefinitions;
+        if (!parsedUser.shiftDefinitions || parsedUser.shiftDefinitions.length === 0) {
+          parsedUser.shiftDefinitions = [...defaultShiftDefinitions.map(def => ({...def, id: crypto.randomUUID()}))];
         }
-        if (!parsedUser.rotaGrid) { // Add default for rotaGrid
-            parsedUser.rotaGrid = defaultRotaGrid;
+        if (!parsedUser.rotaGrid) {
+            parsedUser.rotaGrid = { ...defaultRotaGrid };
+        }
+        if (typeof parsedUser.isProfileComplete === 'undefined') {
+            parsedUser.isProfileComplete = false; // Default for older users
         }
         setUser(parsedUser);
       }
@@ -59,12 +62,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (!loading && user && !user.isProfileComplete && pathname !== '/profile/setup') {
+    if (!loading && user && !user.isProfileComplete && pathname !== '/profile/setup' && pathname !== '/login' && pathname !== '/signup') {
       router.push('/profile/setup');
     }
   }, [user, loading, router, pathname]);
 
-  const initializeNewUser = (email: string): User => ({
+  const initializeNewUser = useCallback((email: string): User => ({
     id: crypto.randomUUID(), 
     email,
     grade: undefined,
@@ -74,28 +77,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     hasPostgraduateLoan: false,
     nhsPensionOptIn: true,
     isProfileComplete: false,
-    scheduleMeta: defaultScheduleMeta,
-    shiftDefinitions: defaultShiftDefinitions,
-    rotaGrid: defaultRotaGrid, // Initialize rotaGrid
-  });
+    scheduleMeta: { ...defaultScheduleMeta },
+    shiftDefinitions: [...defaultShiftDefinitions.map(def => ({...def, id: crypto.randomUUID()}))],
+    rotaGrid: { ...defaultRotaGrid },
+  }), []);
 
-  const login = (email: string) => {
+  const login = useCallback((email: string) => {
     let existingUser: User | null = null;
     try {
       const storedUser = localStorage.getItem('rotaCalcUser');
       if (storedUser) {
-        const parsed = JSON.parse(storedUser);
+        const parsed: User = JSON.parse(storedUser);
         if (parsed.email === email) { 
             existingUser = parsed;
-            if (!existingUser.scheduleMeta) {
-              existingUser.scheduleMeta = defaultScheduleMeta;
-            }
-            if (!existingUser.shiftDefinitions) {
-              existingUser.shiftDefinitions = defaultShiftDefinitions;
-            }
-            if (!existingUser.rotaGrid) { // Ensure rotaGrid exists
-                existingUser.rotaGrid = defaultRotaGrid;
-            }
+            if (!existingUser.scheduleMeta) existingUser.scheduleMeta = { ...defaultScheduleMeta };
+            if (!existingUser.shiftDefinitions || existingUser.shiftDefinitions.length === 0) existingUser.shiftDefinitions = [...defaultShiftDefinitions.map(def => ({...def, id: crypto.randomUUID()}))];
+            if (!existingUser.rotaGrid) existingUser.rotaGrid = { ...defaultRotaGrid };
+            if (typeof existingUser.isProfileComplete === 'undefined') existingUser.isProfileComplete = false;
         }
       }
     } catch (error) {
@@ -115,9 +113,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } else {
       router.push('/');
     }
-  };
+  }, [router, initializeNewUser]);
 
-  const signup = (email: string) => {
+  const signup = useCallback((email: string) => {
     const newUser = initializeNewUser(email);
     setUser(newUser);
     try {
@@ -126,9 +124,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("Failed to set user in localStorage during signup", error);
     }
     router.push('/profile/setup'); 
-  };
+  }, [router, initializeNewUser]);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setUser(null);
     try {
       localStorage.removeItem('rotaCalcUser');
@@ -136,9 +134,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("Failed to remove user from localStorage", error);
     }
     router.push('/login');
-  };
+  }, [router]);
 
-  const updateUserProfile = (updatedData: Partial<UserProfileData>) => {
+  const updateUserProfile = useCallback((updatedData: Partial<UserProfileData>) => {
     setUser(prevUser => {
       if (!prevUser) return null;
       const newUser = { ...prevUser, ...updatedData };
@@ -149,7 +147,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       return newUser;
     });
-  };
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, login, signup, logout, updateUserProfile, loading }}>
