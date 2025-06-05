@@ -298,6 +298,7 @@ export default function MyCalendarPage() {
                   isSelected={selectedDate ? isSameDay(props.date, selectedDate) : false}
                 />
               ),
+              Caption: () => null, // Hide default caption (month/year and nav arrows)
             }}
           />
         </CardContent>
@@ -361,6 +362,3 @@ export default function MyCalendarPage() {
     </div>
   );
 }
-
-
-    
