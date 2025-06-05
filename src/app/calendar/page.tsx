@@ -11,7 +11,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertCircle, CalendarDays, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import type { RotaDocument } from '@/types';
 import { parse, format, isSameDay, addMonths, subMonths, startOfMonth } from 'date-fns';
+import { enGB } from 'date-fns/locale'; // Import en-GB locale
 import CustomCalendarDay from '@/components/calendar/CustomCalendarDay';
+import Link from 'next/link';
 
 export interface DisplayEvent {
   id: string;
@@ -74,25 +76,17 @@ export default function MyCalendarPage() {
 
       const rotaPatternTotalWeeks = rota.scheduleMeta.scheduleTotalWeeks;
       
-      // Day of week for the rota's actual start date (Mon=0, Tue=1, ..., Sun=6)
       const firstDayOfWorkPatternIndex = getPatternDayIndex(scheduleStartDateObj);
 
       let currentCalendarDate = new Date(scheduleStartDateObj);
 
       while (currentCalendarDate <= overallRotaEndDate) {
         const timeDiff = currentCalendarDate.getTime() - scheduleStartDateObj.getTime();
-        // Number of calendar days passed since the rota's actual start date
         const daysOffsetFromActualRotaStart = Math.round(timeDiff / (1000 * 60 * 60 * 24));
-
-        // Determine the effective day in the sequence of the pattern.
-        // Example: If rota starts on Wed (index 2) and 0 days have passed, we use pattern day 2.
-        // If 1 day has passed (Thursday), we use pattern day 3.
         const effectiveDayInPatternSequence = firstDayOfWorkPatternIndex + daysOffsetFromActualRotaStart;
         
-        // Map this to the grid's week and day indices (0-indexed)
-        // The pattern repeats every `rotaPatternTotalWeeks`.
         const patternWeekIndex = Math.floor(effectiveDayInPatternSequence / 7) % rotaPatternTotalWeeks;
-        const patternDayOfWeekIndex = effectiveDayInPatternSequence % 7; // 0=Mon, ..., 6=Sun
+        const patternDayOfWeekIndex = effectiveDayInPatternSequence % 7; 
 
         const dutyCodeKey = `week_${patternWeekIndex}_day_${patternDayOfWeekIndex}`;
         const dutyCode = rota.rotaGrid[dutyCodeKey];
@@ -102,10 +96,10 @@ export default function MyCalendarPage() {
           if (shiftDef) {
             try {
               const [startHour, startMinute] = shiftDef.startTime.split(':').map(Number);
-              const shiftStartDateTime = new Date(currentCalendarDate); // Base shift on the current calendar day
+              const shiftStartDateTime = new Date(currentCalendarDate); 
               shiftStartDateTime.setHours(startHour, startMinute, 0, 0);
 
-              const shiftEndDateTime = new Date(currentCalendarDate); // Base shift on the current calendar day
+              const shiftEndDateTime = new Date(currentCalendarDate); 
               if (shiftDef.finishTime === "24:00") {
                 shiftEndDateTime.setDate(currentCalendarDate.getDate() + 1);
                 shiftEndDateTime.setHours(0, 0, 0, 0);
@@ -113,15 +107,13 @@ export default function MyCalendarPage() {
                 const [finishHour, finishMinute] = shiftDef.finishTime.split(':').map(Number);
                 shiftEndDateTime.setHours(finishHour, finishMinute, 0, 0);
                 if (shiftEndDateTime.getTime() <= shiftStartDateTime.getTime()) {
-                  // Shift ends on the next day
                   shiftEndDateTime.setDate(currentCalendarDate.getDate() + 1);
                 }
               }
               
-              // Ensure the generated shift is within the overall rota period
               if (shiftStartDateTime <= overallRotaEndDate && shiftStartDateTime >= scheduleStartDateObj) {
                    events.push({
-                      id: `${rota.id}-${shiftDef.id}-${shiftStartDateTime.toISOString()}`, // Unique ID
+                      id: `${rota.id}-${shiftDef.id}-${shiftStartDateTime.toISOString()}`, 
                       title: shiftDef.name,
                       dutyCode: shiftDef.dutyCode,
                       start: new Date(shiftStartDateTime),
@@ -137,8 +129,9 @@ export default function MyCalendarPage() {
             }
           }
         }
-        // Move to the next calendar day
-        currentCalendarDate.setDate(currentCalendarDate.getDate() + 1);
+        const newDate = new Date(currentCalendarDate);
+        newDate.setDate(currentCalendarDate.getDate() + 1);
+        currentCalendarDate = newDate;
       }
     });
     return events.sort((a,b) => a.start.getTime() - b.start.getTime());
@@ -147,7 +140,6 @@ export default function MyCalendarPage() {
   const eventsByDay = useMemo(() => {
     const grouped = new Map<string, DisplayEvent[]>();
     allEvents.forEach(event => {
-      // Group by the start day of the event for display in the cell
       const dayKey = format(event.start, 'yyyy-MM-dd');
       if (!grouped.has(dayKey)) {
         grouped.set(dayKey, []);
@@ -163,11 +155,6 @@ export default function MyCalendarPage() {
   
   const eventsOnSelectedDay = useMemo(() => {
     if (!selectedDate) return [];
-    // When a day is clicked, we want to show all shifts that *occur* on that day,
-    // even if they started the day before or end the day after.
-    // For simplicity in this view, we'll stick to events that *start* on the selected day,
-    // as CustomCalendarDay also groups them by start date for cell display.
-    // A more advanced view might filter events that *overlap* with the selected day.
     const dayKey = format(selectedDate, 'yyyy-MM-dd');
     return eventsByDay.get(dayKey) || [];
   }, [eventsByDay, selectedDate]);
@@ -214,6 +201,7 @@ export default function MyCalendarPage() {
         <CardContent className="p-0">
           <DayPicker
             key={currentMonth.toISOString()}
+            locale={enGB} // Set locale to en-GB for Monday start
             mode="single"
             month={currentMonth}
             onMonthChange={setCurrentMonth}
@@ -228,8 +216,8 @@ export default function MyCalendarPage() {
               row: 'flex w-full border-b border-border last:border-b-0',
               cell: 'w-[calc(100%/7)] border-r border-border last:border-r-0 h-32 sm:h-36 md:h-40 flex flex-col',
               day: 'h-full',
-              day_selected: 'bg-primary/20 text-primary-foreground',
-              day_today: 'bg-accent/20 text-accent-foreground !font-bold',
+              day_selected: 'bg-primary/20 text-primary-foreground', // This is overridden by CustomCalendarDay
+              day_today: 'bg-accent/20 text-accent-foreground !font-bold', // This is overridden by CustomCalendarDay
               day_outside: 'text-muted-foreground/50 opacity-50',
             }}
             components={{
@@ -250,7 +238,7 @@ export default function MyCalendarPage() {
         <Card className="shadow-lg mt-6">
           <CardHeader>
             <CardTitle className="text-xl text-primary">
-              Shifts for: {format(selectedDate, 'PPP')}
+              Shifts for: {format(selectedDate, 'PPP', { locale: enGB })}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -286,16 +274,16 @@ export default function MyCalendarPage() {
         </Card>
       )}
 
-      {!user.rotas || user.rotas.length === 0 && (
+      {(!user.rotas || user.rotas.length === 0) && (
          <Card className="mt-6">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-destructive">
                     <AlertCircle /> No Rotas Found
                 </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
                 <p>You haven't uploaded any rotas yet. Please upload a rota to see it on the calendar.</p>
-                <Button asChild>
+                <Button asChild className="mt-2">
                     <Link href="/upload-rota">Upload New Rota</Link>
                 </Button>
             </CardContent>
