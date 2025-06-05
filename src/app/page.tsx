@@ -6,9 +6,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, Settings, CreditCard, ExternalLink, PlusCircle, CalendarDays, FolderKanban, Info, CheckCircle2, HelpCircle } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertTriangle, Settings, CreditCard, ExternalLink, PlusCircle, CalendarDays, FolderKanban, Info, CheckCircle2, HelpCircle, Edit, Trash2 } from 'lucide-react';
 import type { RotaDocument } from '@/types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useToast } from "@/hooks/use-toast";
 
 // Helper function to get icon and tooltip text based on compliance summary
 const getComplianceIconDetails = (summary?: string) => {
@@ -22,7 +24,16 @@ const getComplianceIconDetails = (summary?: string) => {
 };
 
 export default function DashboardPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, deleteRotaDocument } = useAuth();
+  const { toast } = useToast();
+
+  const handleDeleteRota = (rotaId: string) => {
+    deleteRotaDocument(rotaId);
+    toast({
+      title: "Rota Removed",
+      description: "The rota has been successfully removed.",
+    });
+  };
 
   if (authLoading) {
     return (
@@ -113,8 +124,8 @@ export default function DashboardPage() {
                   const { Icon: ComplianceStatusIcon, color: complianceIconColor, tooltipText: complianceTooltipText } = getComplianceIconDetails(rota.complianceSummary);
                   return (
                     <div key={rota.id} className="p-4 border rounded-lg bg-card hover:shadow-md transition-shadow">
-                      <div className="flex justify-between items-start">
-                        <div>
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="flex-grow">
                           <h3 className="font-medium text-lg text-accent">{rota.name || `Rota starting ${new Date(rota.scheduleMeta.scheduleStartDate).toLocaleDateString()}`}</h3>
                           <p className="text-sm text-muted-foreground">
                             Site: {rota.scheduleMeta.site || 'N/A'} | Specialty: {rota.scheduleMeta.specialty || 'N/A'}
@@ -122,6 +133,36 @@ export default function DashboardPage() {
                           <p className="text-xs text-muted-foreground">
                             Dates: {new Date(rota.scheduleMeta.scheduleStartDate).toLocaleDateString()} - {new Date(rota.scheduleMeta.endDate).toLocaleDateString()}
                           </p>
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-2 items-end sm:items-center flex-shrink-0">
+                           <Button asChild variant="outline" size="sm">
+                             <Link href={`/rota-checker?rotaId=${rota.id}`}>
+                               <Edit className="h-4 w-4 sm:mr-2" />
+                               <span className="hidden sm:inline">Edit</span>
+                             </Link>
+                           </Button>
+                           <AlertDialog>
+                             <AlertDialogTrigger asChild>
+                               <Button variant="destructive" size="sm">
+                                 <Trash2 className="h-4 w-4 sm:mr-2" />
+                                 <span className="hidden sm:inline">Remove</span>
+                               </Button>
+                             </AlertDialogTrigger>
+                             <AlertDialogContent>
+                               <AlertDialogHeader>
+                                 <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                 <AlertDialogDescription>
+                                   This action will permanently remove the rota titled "{rota.name || `Rota starting ${new Date(rota.scheduleMeta.scheduleStartDate).toLocaleDateString()}`}". This cannot be undone.
+                                 </AlertDialogDescription>
+                               </AlertDialogHeader>
+                               <AlertDialogFooter>
+                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                 <AlertDialogAction onClick={() => handleDeleteRota(rota.id)} className="bg-destructive hover:bg-destructive/90">
+                                   Yes, Remove Rota
+                                 </AlertDialogAction>
+                               </AlertDialogFooter>
+                             </AlertDialogContent>
+                           </AlertDialog>
                         </div>
                       </div>
                       <div className="mt-3 flex flex-col sm:flex-row gap-2">
