@@ -172,38 +172,11 @@ body {
 
 
 .text-xxs {
-  font-size: 0.65rem; /* 10.4px */
-  line-height: 0.85rem; /* 13.6px */
+  font-size: 0.6rem; /* Previous: 0.65rem (10.4px) */
+  line-height: 0.75rem; /* Previous: 0.85rem (13.6px) */
 }
 
 /* Calendar styles */
-.dark-calendar-theme {
-  @apply bg-slate-800 text-slate-100;
-  --card-foreground: hsl(220 13% 95%); /* Light gray for text in dark calendar */
-  --muted-foreground: hsl(220 10% 65%);
-  --border: hsl(220 15% 30%);
-  --primary: hsl(174 100% 35%); /* Teal primary for dark calendar */
-  --primary-foreground: hsl(0 0% 100%);
-  --accent: hsl(231 48% 55%); /* Lighter blue accent */
-  --accent-foreground: hsl(0 0% 100%);
-}
-
-.dark-calendar-theme .rdp-button {
-  @apply text-slate-200 hover:bg-slate-700;
-}
-
-.dark-calendar-theme .rdp-caption_label {
-  @apply text-slate-50;
-}
-
-.dark-calendar-theme .rdp-nav_button {
-  @apply text-slate-300 hover:text-slate-100 hover:bg-slate-700;
-}
-.dark-calendar-theme .rdp-head_cell {
-  @apply text-slate-400;
-}
-
-/* Custom styles for the rota-calendar table structure */
 .rota-calendar .rdp-table { @apply border-collapse w-full; }
 .rota-calendar .rdp-head_row { @apply flex border-b border-border; } /* Use theme border */
 .rota-calendar .rdp-head_cell { @apply w-[calc(100%/7)] p-2 text-xs text-center font-medium text-muted-foreground; }
@@ -238,5 +211,7 @@ body {
   background-color: hsl(var(--accent) / 0.2);
   color: hsl(var(--accent));
 }
+
+    
 
     
