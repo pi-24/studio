@@ -6,9 +6,20 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, Settings, ListChecks, CreditCard, ExternalLink, PlusCircle, CalendarDays, FolderKanban, Info, AlertCircle as AlertErrorIcon, CheckCircle2, HelpCircle } from 'lucide-react';
+import { AlertTriangle, Settings, CreditCard, ExternalLink, PlusCircle, CalendarDays, FolderKanban, Info, CheckCircle2, HelpCircle, Hourglass } from 'lucide-react';
 import type { RotaDocument } from '@/types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
+// Helper function to get icon and tooltip text based on compliance summary
+const getComplianceIconDetails = (summary?: string) => {
+  if (summary === 'Compliant') {
+    return { Icon: CheckCircle2, color: 'text-green-500', tooltipText: 'Compliant' };
+  }
+  if (summary === 'Review Needed') {
+    return { Icon: AlertTriangle, color: 'text-amber-500', tooltipText: 'Review Needed' };
+  }
+  return { Icon: HelpCircle, color: 'text-muted-foreground', tooltipText: 'Compliance status unknown. Process in Rota Checker.' };
+};
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
@@ -66,47 +77,6 @@ export default function DashboardPage() {
   
   const hasRotas = user.rotas && user.rotas.length > 0;
 
-  const ComplianceIcon = ({ summary }: { summary?: string }) => {
-    if (!summary) {
-      return (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <HelpCircle className="h-5 w-5 text-muted-foreground" />
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Compliance status unknown. View in Rota Checker to process.</p>
-          </TooltipContent>
-        </Tooltip>
-      );
-    }
-    if (summary === 'Compliant') {
-      return (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <CheckCircle2 className="h-5 w-5 text-green-500" />
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Compliant</p>
-          </TooltipContent>
-        </Tooltip>
-      );
-    }
-    if (summary === 'Review Needed') {
-      return (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Review Needed</p>
-          </TooltipContent>
-        </Tooltip>
-      );
-    }
-    return null; 
-  };
-
-
   return (
     <TooltipProvider>
       <div className="space-y-10">
@@ -142,106 +112,90 @@ export default function DashboardPage() {
                 <FolderKanban className="h-5 w-5" /> My Rotas
               </CardTitle>
               <CardDescription>
-                View and manage your uploaded rotas. Click a rota to view its compliance report.
+                View your uploaded rotas and access compliance or pay estimation tools.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {user.rotas?.map((rota: RotaDocument) => (
-                <Link key={rota.id} href={`/rota-checker?rotaId=${rota.id}`} passHref>
-                  <div className="block p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
-                    <div className="flex justify-between items-center">
-                        <h3 className="font-medium text-lg text-accent">{rota.name || `Rota starting ${rota.scheduleMeta.scheduleStartDate}`}</h3>
-                        <ComplianceIcon summary={rota.complianceSummary} />
+            <CardContent className="space-y-4">
+              {user.rotas?.map((rota: RotaDocument) => {
+                const { Icon: ComplianceStatusIcon, color: complianceIconColor, tooltipText: complianceTooltipText } = getComplianceIconDetails(rota.complianceSummary);
+                return (
+                  <div key={rota.id} className="p-4 border rounded-lg bg-card hover:shadow-md transition-shadow">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-medium text-lg text-accent">{rota.name || `Rota starting ${new Date(rota.scheduleMeta.scheduleStartDate).toLocaleDateString()}`}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Site: {rota.scheduleMeta.site || 'N/A'} | Specialty: {rota.scheduleMeta.specialty || 'N/A'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Dates: {new Date(rota.scheduleMeta.scheduleStartDate).toLocaleDateString()} - {new Date(rota.scheduleMeta.endDate).toLocaleDateString()}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      Site: {rota.scheduleMeta.site || 'N/A'} | Specialty: {rota.scheduleMeta.specialty || 'N/A'}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Dates: {new Date(rota.scheduleMeta.scheduleStartDate).toLocaleDateString()} - {new Date(rota.scheduleMeta.endDate).toLocaleDateString()}
-                    </p>
+                    <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button asChild variant="outline" size="sm" className="flex-1 justify-start text-left">
+                            <Link href={`/rota-checker?rotaId=${rota.id}`}>
+                              <ComplianceStatusIcon className={`h-4 w-4 ${complianceIconColor}`} />
+                              <span className="ml-2">Compliance Check Results</span>
+                            </Link>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{complianceTooltipText}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Button asChild variant="outline" size="sm" className="flex-1 justify-start text-left">
+                        <Link href="/pay-checker/coming-soon">
+                          <CreditCard className="h-4 w-4 text-primary/80" />
+                          <span className="ml-2">Estimated Pay Results</span>
+                        </Link>
+                      </Button>
+                    </div>
                   </div>
-                </Link>
-              ))}
+                );
+              })}
             </CardContent>
           </Card>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="hover:shadow-xl transition-shadow">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl text-primary">
-                <CalendarDays className="h-6 w-6"/> My Calendar
-              </CardTitle>
-              <CardDescription>
-                View your upcoming shifts and schedule in a calendar format.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild className="w-full">
-                <Link href="/calendar">
-                  Open Calendar
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
+        {/* "My Calendar" Card - This remains from the original structure */}
+        <Card className="hover:shadow-xl transition-shadow">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-xl text-primary">
+              <CalendarDays className="h-6 w-6"/> My Calendar
+            </CardTitle>
+            <CardDescription>
+              View your upcoming shifts and schedule in a calendar format.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild className="w-full">
+              <Link href="/calendar">
+                Open Calendar
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
 
-          <Card className="hover:shadow-xl transition-shadow">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl text-accent">
-                <ListChecks className="h-6 w-6"/> Rota Compliance Checker
-              </CardTitle>
-              <CardDescription>
-                Select a rota from "My Rotas" to analyze its compliance against NHS rules.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button disabled={!hasRotas} asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" title={!hasRotas ? "Upload a rota first" : "View Rota Checker"}>
-                <Link href={hasRotas && user.rotas && user.rotas.length > 0 ? `/rota-checker?rotaId=${user.rotas[0].id}` : "/rota-checker"}>
-                  Open Rota Checker
-                </Link>
-              </Button>
-              {!hasRotas && (
-                  <p className="text-xs text-amber-600 dark:text-amber-500 mt-3 flex items-center gap-1">
-                      <AlertErrorIcon size={14}/> Please upload a rota first to use the checker.
-                  </p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="hover:shadow-xl transition-shadow">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl text-primary">
-                <CreditCard className="h-6 w-6"/> Pay Checker
-              </CardTitle>
-              <CardDescription>
-                Estimate your salary based on your rota and NHS pay scales. (Coming Soon)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button disabled className="w-full">
-                Open Pay Checker (Coming Soon)
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
+        {/* "Manage Your Personal Profile" Card - This remains */}
         <Card className="mt-10 shadow-lg">
-              <CardHeader>
-                  <CardTitle className="text-xl font-semibold text-primary flex items-center gap-2">
-                      <Settings className="h-5 w-5" /> Manage Your Personal Profile
-                  </CardTitle>
-                  <CardDescription>
-                      Update your grade, region, tax details, and other personal information. Rota-specific details (config, shifts, grid) are managed via "Upload New Rota" or by editing an existing rota through the Rota Checker.
-                  </CardDescription>
-              </CardHeader>
-              <CardContent>
-                  <Button asChild variant="outline">
-                      <Link href="/profile">
-                          Go to Profile <ExternalLink className="ml-2 h-4 w-4" />
-                      </Link>
-                  </Button>
-              </CardContent>
-          </Card>
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold text-primary flex items-center gap-2">
+              <Settings className="h-5 w-5" /> Manage Your Personal Profile
+            </CardTitle>
+            <CardDescription>
+              Update your grade, region, tax details, and other personal information. Rota-specific details are managed via "Upload New Rota" or by editing an existing rota.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline">
+              <Link href="/profile">
+                Go to Profile <ExternalLink className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </TooltipProvider>
   );
