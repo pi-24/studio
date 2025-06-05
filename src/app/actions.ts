@@ -828,21 +828,23 @@ const WORKING_LIMITS = [
     pdfReference: 'Schedule 3, Para 16 & 18',
     category: CATEGORIES.WEEKEND_WORK,
     check: (shifts: ProcessedShift[], scheduleWeeks: number) => {
-        if (!shifts || !shifts.length || !scheduleWeeks || scheduleWeeks < 1) return { isViolated: false, userValue: 'N/A', limitValue: '1 in 3', difference: 'N/A', details: 'Not enough data.' };
+        if (!shifts || !shifts.length || !scheduleWeeks || scheduleWeeks < 1) return { isViolated: false, userValue: 'N/A', limitValue: '1 in 3 (max 1 in 2)', difference: 'N/A', details: 'Not enough data.' };
+        
         const weekendsWorked = new Set<string>();
         shifts.forEach(shift => {
-            if (isWeekendShift(shift)) { // isWeekendShift checks if any part of the shift falls on Sat/Sun
+            if (isWeekendShift(shift)) {
                 const shiftStartDate = new Date(shift.start);
                 const dayOfWeek = shiftStartDate.getDay();
-                // Normalize to Saturday as the weekend identifier
                 const saturdayDate = new Date(shiftStartDate);
-                saturdayDate.setDate(shiftStartDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -1 : 6)); // if Sunday, go back to Sat; if Sat, it's Sat
+                saturdayDate.setDate(shiftStartDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -1 : 6));
                 saturdayDate.setHours(0,0,0,0);
                 weekendsWorked.add(saturdayDate.toISOString().split('T')[0]);
             }
         });
+        
         const numWeekendsWorked = weekendsWorked.size;
-        const totalWeekendsInSchedule = scheduleWeeks; // Assuming scheduleWeeks is total number of calendar weeks
+        const totalWeekendsInSchedule = scheduleWeeks;
+        
         let frequencyText = 'N/A';
         if (numWeekendsWorked > 0 && totalWeekendsInSchedule > 0) {
           frequencyText = `1 in ${(totalWeekendsInSchedule / numWeekendsWorked).toFixed(1)}`;
@@ -850,19 +852,25 @@ const WORKING_LIMITS = [
           frequencyText = '0 weekends worked';
         }
 
-        const isViolated1in3 = numWeekendsWorked > 0 && totalWeekendsInSchedule > 0 ? (totalWeekendsInSchedule / numWeekendsWorked) < 3 : false;
-        const isViolated1in2 = numWeekendsWorked > 0 && totalWeekendsInSchedule > 0 ? (totalWeekendsInSchedule / numWeekendsWorked) < 2 : false;
+        const violates1in3Guideline = numWeekendsWorked > 0 && totalWeekendsInSchedule > 0 ? (totalWeekendsInSchedule / numWeekendsWorked) < 3 : false;
+        const violates1in2AbsoluteMax = numWeekendsWorked > 0 && totalWeekendsInSchedule > 0 ? (totalWeekendsInSchedule / numWeekendsWorked) < 2 : false;
         
-        let details = `Worked ${numWeekendsWorked} weekends in ${totalWeekendsInSchedule} weeks (${frequencyText}).`;
+        const isActuallyViolated = violates1in3Guideline; // Flag violation if 1-in-3 guideline is breached.
         let violationSummary = '';
-        if (isViolated1in2) violationSummary = 'Exceeds 1 in 2 limit (absolute max).';
-        else if (isViolated1in3) violationSummary = 'Exceeds 1 in 3 guidance (but within 1 in 2).';
+
+        if (violates1in2AbsoluteMax) {
+            violationSummary = 'Exceeds 1 in 2 limit (absolute max).';
+        } else if (violates1in3Guideline) {
+            violationSummary = 'Exceeds 1 in 3 guidance.';
+        }
+        
+        const details = `Worked ${numWeekendsWorked} weekends in ${totalWeekendsInSchedule} weeks (${frequencyText}).`;
         
         return {
-            isViolated: isViolated1in2, // Stricter violation for actual breach
+            isViolated: isActuallyViolated,
             userValue: frequencyText, 
             limitValue: '1 in 3 (max 1 in 2)',
-            difference: violationSummary || (isViolated1in3 ? 'Review: Exceeds 1 in 3' : 'Met'), 
+            difference: violationSummary || 'Met', 
             details,
         };
     },
