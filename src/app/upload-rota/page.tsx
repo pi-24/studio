@@ -60,11 +60,11 @@ const rotaSpecificScheduleMetadataSchema = z.object({
   annualLeaveEntitlement: z.number().min(0, "Min 0 days"),
   hoursInNormalDay: z.number().min(1, "Min 1 hour").max(24, "Max 24 hours"),
 }).refine(data => {
-    if (!data.scheduleStartDate || !data.endDate) return true; 
+    if (!data.scheduleStartDate || !data.endDate) return true;
     try {
         return new Date(data.endDate) >= new Date(data.scheduleStartDate);
     } catch (e) {
-        return true; 
+        return true;
     }
 }, {
     message: "End date must be after or the same as start date",
@@ -81,7 +81,7 @@ const uploadRotaSchema = z.object({
         return new Set(dutyCodes).size === dutyCodes.length;
     }, {
       message: 'Duty Codes must be unique',
-      path: ['shiftDefinitions'] 
+      path: ['shiftDefinitions']
     }),
   rotaGrid: rotaGridSchema.optional(),
 });
@@ -107,7 +107,7 @@ export default function UploadRotaPage() {
         specialty: '',
         scheduleStartDate: new Date().toISOString().split('T')[0],
         endDate: new Date(new Date().setDate(new Date().getDate() + 28)).toISOString().split('T')[0],
-        scheduleTotalWeeks: 4, 
+        scheduleTotalWeeks: 4,
         wtrOptOut: false,
         annualLeaveEntitlement: 27,
         hoursInNormalDay: 8,
@@ -144,7 +144,7 @@ export default function UploadRotaPage() {
         return;
     }
     setIsSavingAndProcessing(true);
-    
+
     const finalRotaGrid: RotaGridInput = {};
     if (data.rotaGrid) {
         for (const key in data.rotaGrid) {
@@ -157,7 +157,7 @@ export default function UploadRotaPage() {
       name: data.scheduleMeta.name,
       scheduleMeta: data.scheduleMeta,
       shiftDefinitions: data.shiftDefinitions,
-      rotaGrid: finalRotaGrid, 
+      rotaGrid: finalRotaGrid,
       createdAt: new Date().toISOString(),
     };
 
@@ -184,19 +184,19 @@ export default function UploadRotaPage() {
         };
 
         addRotaDocument(newRotaDocument);
-        router.push('/'); 
+        router.push('/');
 
     } catch (error) {
         console.error("Error during rota processing or saving:", error);
         toast({ title: "Error", description: "Failed to save or process the rota. Please try again.", variant: "destructive"});
         const newRotaDocument: RotaDocument = { ...rotaDocumentBase, complianceSummary: undefined };
         addRotaDocument(newRotaDocument);
-        router.push('/'); 
+        router.push('/');
     } finally {
         setIsSavingAndProcessing(false);
     }
   };
-  
+
   const addShiftDefinition = () => {
     const newDutyCode = `S${shiftDefFields.length + 1}`;
     appendShiftDef({ id: crypto.randomUUID(), dutyCode: newDutyCode, name: '', type: 'normal', startTime: '09:00', finishTime: '17:00', durationStr: '8h 0m' });
@@ -205,10 +205,10 @@ export default function UploadRotaPage() {
   const validateStep = async (step: number) => {
     let fieldsToValidate: (keyof UploadRotaFormValues | `scheduleMeta.${keyof RotaSpecificScheduleMetadata}` | `shiftDefinitions.${number}.${keyof ShiftDefinitionType}` | 'shiftDefinitions' )[] = [];
     if (step === 1) fieldsToValidate = ['scheduleMeta'];
-    if (step === 2) fieldsToValidate = ['shiftDefinitions']; 
-    if (step === 3) fieldsToValidate = ['rotaGrid' as any]; 
-    
-    const isValid = await trigger(fieldsToValidate as any); 
+    if (step === 2) fieldsToValidate = ['shiftDefinitions'];
+    if (step === 3) fieldsToValidate = ['rotaGrid' as any];
+
+    const isValid = await trigger(fieldsToValidate as any);
     return isValid;
   }
 
@@ -309,7 +309,7 @@ export default function UploadRotaPage() {
                   <div className="overflow-x-auto custom-scrollbar">
                     <table className="min-w-full">
                         <thead className="bg-muted/50">
-                            <tr>{['Duty Code', 'Name', 'Type', 'Start Time', 'Finish Time', 'Duration', 'Actions'].map(h=><th key={h} className="px-3 py-2 text-left text-xs font-medium">{h}</th>)}</tr>
+                            <tr>{['Duty Code', 'Name', 'Type', 'Start Time', 'Finish Time', 'Actions'].map(h=><th key={h} className="px-3 py-2 text-left text-xs font-medium">{h}</th>)}</tr>
                         </thead>
                         <tbody>
                           {shiftDefFields.map((field, index) => (
@@ -339,7 +339,6 @@ export default function UploadRotaPage() {
                                 <Input type="text" {...register(`shiftDefinitions.${index}.finishTime`)} placeholder="HH:MM or 24:00" className="w-32"/>
                                 {errors.shiftDefinitions?.[index]?.finishTime && <p className="text-xxs text-destructive mt-0.5">{errors.shiftDefinitions[index]?.finishTime?.message}</p>}
                               </td>
-                              <td className="text-sm pl-2">{watch(`shiftDefinitions.${index}.durationStr`)}</td>
                               <td>{shiftDefFields.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={()=>removeShiftDef(index)}><Trash2 className="h-4 w-4 text-destructive"/></Button>}</td>
                             </tr>
                           ))}
@@ -376,7 +375,7 @@ export default function UploadRotaPage() {
                                                     <Controller
                                                         name={`rotaGrid.week_${weekIndex}_day_${dayIndex}`}
                                                         control={control}
-                                                        defaultValue="" 
+                                                        defaultValue=""
                                                         render={({ field }) => (
                                                             <Select onValueChange={field.onChange} value={field.value || ""}>
                                                                 <SelectTrigger className="w-full min-w-[100px] sm:min-w-[120px] h-9 text-xs">
@@ -412,7 +411,7 @@ export default function UploadRotaPage() {
             <Button type="button" variant="outline" onClick={() => router.push('/')} disabled={isSavingAndProcessing}>Cancel</Button>
             {currentStep > 1 && <Button type="button" variant="outline" onClick={prevStep} disabled={isSavingAndProcessing}>Previous</Button>}
             {currentStep < 3 && <Button type="button" onClick={nextStep} className="ml-auto" disabled={isSavingAndProcessing}>Next <ArrowRight className="ml-2 h-4 w-4"/></Button>}
-            {currentStep === 3 && 
+            {currentStep === 3 &&
                 <Button type="submit" disabled={isSavingAndProcessing} className="ml-auto bg-accent hover:bg-accent/90 text-accent-foreground">
                     {isSavingAndProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                     {isSavingAndProcessing ? 'Saving & Checking...' : 'Save Rota & Check Compliance'}
@@ -424,4 +423,4 @@ export default function UploadRotaPage() {
     </div>
   );
 }
-    
+
