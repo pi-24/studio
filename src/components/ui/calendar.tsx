@@ -1,11 +1,14 @@
+
 "use client"
 
 import * as React from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
-import { DayPicker } from "react-day-picker"
+import { DayPicker, DropdownProps } from "react-day-picker"
 
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select"
+import { ScrollArea } from "./scroll-area"
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>
 
@@ -13,8 +16,27 @@ function Calendar({
   className,
   classNames,
   showOutsideDays = true,
+  captionLayout = "dropdown-buttons", // Default to dropdown for year/month
+  fromYear = new Date().getFullYear() - 100, // Default fromYear
+  toYear = new Date().getFullYear() + 10,   // Default toYear
   ...props
 }: CalendarProps) {
+  
+  const handleCalendarChange = (
+    _month: Date,
+    e: React.ChangeEvent<HTMLSelectElement>
+  ) => {
+    const newMonth = new Date(_month);
+    if (e.target.name === "months") {
+      newMonth.setMonth(parseInt(e.target.value, 10));
+    } else if (e.target.name === "years") {
+      newMonth.setFullYear(parseInt(e.target.value, 10));
+    }
+    if (props.onMonthChange) {
+      props.onMonthChange(newMonth);
+    }
+  };
+
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
@@ -23,7 +45,8 @@ function Calendar({
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
         caption: "flex justify-center pt-1 relative items-center",
-        caption_label: "text-sm font-medium",
+        caption_label: captionLayout === "dropdown-buttons" ? "hidden": "text-sm font-medium", // Hide default label if using dropdowns
+        caption_dropdowns: "flex gap-2 items-center", // Class for dropdown container
         nav: "space-x-1 flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
@@ -46,21 +69,65 @@ function Calendar({
           "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
         day_today: "bg-accent text-accent-foreground",
         day_outside:
-          "day-outside text-muted-foreground aria-selected:bg-accent/50 aria-selected:text-muted-foreground",
+          "day-outside text-muted-foreground opacity-50 aria-selected:bg-accent/50 aria-selected:text-muted-foreground ", // Removed ! from opacity to allow custom styling to override
         day_disabled: "text-muted-foreground opacity-50",
         day_range_middle:
           "aria-selected:bg-accent aria-selected:text-accent-foreground",
         day_hidden: "invisible",
+        dropdown_month: "flex gap-2", // For month/year dropdowns
+        dropdown_year: "flex gap-2",
+        dropdown: "text-sm px-2 py-1 border rounded-md bg-background", // Style for the select itself
         ...classNames,
       }}
       components={{
-        IconLeft: ({ className, ...props }) => (
-          <ChevronLeft className={cn("h-4 w-4", className)} {...props} />
+        IconLeft: ({ className: cName, ...restProps }) => (
+          <ChevronLeft className={cn("h-4 w-4", cName)} {...restProps} />
         ),
-        IconRight: ({ className, ...props }) => (
-          <ChevronRight className={cn("h-4 w-4", className)} {...props} />
+        IconRight: ({ className: cName, ...restProps }) => (
+          <ChevronRight className={cn("h-4 w-4", cName)} {...restProps} />
         ),
+        Dropdown: (dropdownProps: DropdownProps) => {
+          const { name, value, onChange, children, ...rest } = dropdownProps;
+          const options = React.Children.toArray(children) as React.ReactElement<React.HTMLProps<HTMLOptionElement>>[];
+          const currentYear = new Date().getFullYear();
+          const selectValue = String(value);
+
+          return (
+            <Select
+              name={name}
+              value={selectValue}
+              onValueChange={(val) => {
+                 if (onChange) {
+                    // Simulate event object for DayPicker's internal handler
+                    const simulatedEvent = { target: { value: val, name } } as React.ChangeEvent<HTMLSelectElement>;
+                    onChange(simulatedEvent);
+                  }
+              }}
+            >
+              <SelectTrigger className="w-[120px] text-sm h-8 focus:ring-0 focus:ring-offset-0">
+                <SelectValue>
+                  {options.find(option => option.props.value === selectValue)?.props.children}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent className="max-h-[200px]">
+                <ScrollArea className="h-full">
+                {options.map((option) => (
+                  <SelectItem
+                    key={option.props.value}
+                    value={String(option.props.value)}
+                  >
+                    {option.props.children}
+                  </SelectItem>
+                ))}
+                </ScrollArea>
+              </SelectContent>
+            </Select>
+          );
+        },
       }}
+      captionLayout={captionLayout}
+      fromYear={fromYear}
+      toYear={toYear}
       {...props}
     />
   )
@@ -68,3 +135,5 @@ function Calendar({
 Calendar.displayName = "Calendar"
 
 export { Calendar }
+
+    

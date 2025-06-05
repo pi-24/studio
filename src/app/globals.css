@@ -55,6 +55,15 @@ body {
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Specific colors for event backgrounds in calendar, if not using Tailwind bg classes directly */
+    --sky: 200 89% 53%; /* approx. bg-sky-500 */
+    --green: 145 63% 49%; /* approx. bg-green-500 */
+    --yellow: 48 96% 50%; /* approx. bg-yellow-500 */
+    --purple: 262 70% 55%; /* approx. bg-purple-500 */
+    --pink: 330 80% 60%; /* approx. bg-pink-500 */
+    --indigo: 230 70% 60%; /* approx. bg-indigo-500 */
+    --teal: 174 100% 29%; /* approx. bg-teal-500 (same as accent) */
   }
 
   .dark {
@@ -122,57 +131,105 @@ body {
 }
 .custom-scrollbar::-webkit-scrollbar-track {
   @apply bg-muted/50 rounded-lg;
-  /* For dark theme specifically, if needed: */
-  /* .dark & { @apply bg-slate-700; } */
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
   @apply bg-primary/70 rounded-lg;
-   /* For dark theme specifically, if needed: */
-  /* .dark & { @apply bg-sky-600; } */
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   @apply bg-primary;
-   /* For dark theme specifically, if needed: */
-  /* .dark & { @apply bg-sky-500; } */
 }
 
-/* Ensure dark mode scrollbars are styled if necessary */
 .dark .custom-scrollbar::-webkit-scrollbar-track {
-   background-color: hsl(var(--muted)); /* Or a more specific dark muted color like 220 15% 20% */
+   background-color: hsl(var(--muted)); 
 }
 .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: hsl(var(--primary)); /* Teal */
+  background-color: hsl(var(--primary)); 
 }
 .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-   background-color: hsl(var(--primary-foreground)); /* Lighter teal for hover or primary-foreground if it contrasts well */
+   background-color: hsl(var(--primary-foreground)); 
 }
+
+/* Smaller scrollbar for calendar day cells */
+.custom-scrollbar-small::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.custom-scrollbar-small::-webkit-scrollbar-track {
+  @apply bg-transparent rounded-md;
+}
+.custom-scrollbar-small::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/30 rounded-md;
+}
+.custom-scrollbar-small::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/50;
+}
+.dark .custom-scrollbar-small::-webkit-scrollbar-thumb {
+  @apply bg-border/50;
+}
+.dark .custom-scrollbar-small::-webkit-scrollbar-thumb:hover {
+  @apply bg-border;
+}
+
+
 .text-xxs {
   font-size: 0.65rem; /* 10.4px */
   line-height: 0.85rem; /* 13.6px */
 }
 
-/* Custom style for react-day-picker for scheduled days */
+/* Calendar styles */
+.dark-calendar-theme {
+  @apply bg-slate-800 text-slate-100;
+  --card-foreground: hsl(220 13% 95%); /* Light gray for text in dark calendar */
+  --muted-foreground: hsl(220 10% 65%);
+  --border: hsl(220 15% 30%);
+  --primary: hsl(174 100% 35%); /* Teal primary for dark calendar */
+  --primary-foreground: hsl(0 0% 100%);
+  --accent: hsl(231 48% 55%); /* Lighter blue accent */
+  --accent-foreground: hsl(0 0% 100%);
+}
+
+.dark-calendar-theme .rdp-button {
+  @apply text-slate-200 hover:bg-slate-700;
+}
+
+.dark-calendar-theme .rdp-caption_label {
+  @apply text-slate-50;
+}
+
+.dark-calendar-theme .rdp-nav_button {
+  @apply text-slate-300 hover:text-slate-100 hover:bg-slate-700;
+}
+.dark-calendar-theme .rdp-head_cell {
+  @apply text-slate-400;
+}
+
+/* Custom styles for the rota-calendar table structure */
+.rota-calendar .rdp-table { @apply border-collapse w-full; }
+.rota-calendar .rdp-head_row { @apply flex border-b border-border; } /* Use theme border */
+.rota-calendar .rdp-head_cell { @apply w-[calc(100%/7)] p-2 text-xs text-center font-medium text-muted-foreground; }
+.rota-calendar .rdp-row { @apply flex w-full border-b border-border last:border-b-0; }
+.rota-calendar .rdp-cell { @apply w-[calc(100%/7)] border-r border-border last:border-r-0; }
+
+/* Custom day component styling */
+.rota-calendar-day {
+  /* min-height to ensure cells are somewhat uniform, adjust as needed */
+  /* This is now handled by fixed height on .rdp-cell in the page component */
+}
+
+/* Remove default day_selected and day_today background from react-day-picker default button,
+   as CustomCalendarDay handles its own selection and today indicators */
+.rota-calendar .rdp-day_selected > .rdp-button:not(.rdp-day_outside) {
+  @apply bg-transparent text-inherit;
+}
+.rota-calendar .rdp-day_today > .rdp-button:not(.rdp-day_outside) {
+  @apply bg-transparent text-inherit;
+}
+
+
+/* Legacy styles for react-day-picker (can be removed if not used by default picker) */
 .day-scheduled {
   font-weight: bold;
-  /* You can add more distinctive styling, e.g., a dot or background */
-  /* Example: position: relative; */
 }
-/* Example dot using ::after pseudo-element */
-/*
-.day-scheduled::after {
-  content: '';
-  position: absolute;
-  bottom: 4px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background-color: hsl(var(--accent));
-}
-*/
-
-/* If you want to color the day itself */
 .day-scheduled:not(.rdp-day_selected) > .rdp-button {
   background-color: hsl(var(--accent) / 0.1);
   color: hsl(var(--accent));
@@ -181,3 +238,5 @@ body {
   background-color: hsl(var(--accent) / 0.2);
   color: hsl(var(--accent));
 }
+
+    

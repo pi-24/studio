@@ -1,17 +1,19 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
-import { Calendar } from '@/components/ui/calendar';
+import { DayPicker, type DateRange } from 'react-day-picker';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { AlertCircle, CalendarDays, Loader2 } from 'lucide-react';
-import type { RotaDocument, ShiftDefinition } from '@/types';
-import { format, isSameDay, parse } from 'date-fns';
+import { AlertCircle, CalendarDays, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import type { RotaDocument } from '@/types';
+import { format, isSameDay, parse, addMonths, subMonths, startOfMonth } from 'date-fns';
+import CustomCalendarDay from '@/components/calendar/CustomCalendarDay';
 
-interface DisplayEvent {
+export interface DisplayEvent {
   id: string;
   title: string;
   dutyCode: string;
@@ -20,27 +22,49 @@ interface DisplayEvent {
   rotaName: string;
   site: string;
   type: 'normal' | 'on-call';
+  color?: string; // Optional color for event styling
 }
+
+const eventColors = [
+  'bg-sky-500',
+  'bg-green-500',
+  'bg-yellow-500',
+  'bg-purple-500',
+  'bg-pink-500',
+  'bg-indigo-500',
+  'bg-teal-500',
+];
+let colorIndex = 0;
 
 export default function MyCalendarPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  
+  const [currentMonth, setCurrentMonth] = useState<Date>(startOfMonth(new Date()));
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
 
   const allEvents = useMemo(() => {
     if (!user || !user.rotas || user.rotas.length === 0) {
       return [];
     }
+    colorIndex = 0; // Reset color index for each calculation
+    const rotaColorMap = new Map<string, string>();
 
     const events: DisplayEvent[] = [];
     user.rotas.forEach((rota: RotaDocument) => {
       if (!rota.scheduleMeta || !rota.rotaGrid || !rota.shiftDefinitions) return;
 
+      if (!rotaColorMap.has(rota.id)) {
+        rotaColorMap.set(rota.id, eventColors[colorIndex % eventColors.length]);
+        colorIndex++;
+      }
+      const rotaColor = rotaColorMap.get(rota.id);
+
       const scheduleStartDateObj = parse(rota.scheduleMeta.scheduleStartDate, 'yyyy-MM-dd', new Date());
-      if (isNaN(scheduleStartDateObj.getTime())) return; // Invalid start date for this rota
+      if (isNaN(scheduleStartDateObj.getTime())) return; 
 
       for (let w = 0; w < rota.scheduleMeta.scheduleTotalWeeks; w++) {
-        for (let d = 0; d < 7; d++) { // Assuming 0 = Monday, ..., 6 = Sunday as per typical grid
+        for (let d = 0; d < 7; d++) { 
           const dutyCode = rota.rotaGrid[`week_${w}_day_${d}`];
           if (dutyCode && dutyCode !== "_OFF_") {
             const shiftDef = rota.shiftDefinitions.find(sd => sd.dutyCode === dutyCode);
@@ -65,7 +89,6 @@ export default function MyCalendarPage() {
                   }
                 }
                 
-                // Create multiple events if rota repeats over a longer period than its cycle
                 const rotaCycleDays = rota.scheduleMeta.scheduleTotalWeeks * 7;
                 const overallRotaEndDate = parse(rota.scheduleMeta.endDate, 'yyyy-MM-dd', new Date());
                 if (isNaN(overallRotaEndDate.getTime())) continue;
@@ -83,6 +106,7 @@ export default function MyCalendarPage() {
                         rotaName: rota.name,
                         site: rota.scheduleMeta.site,
                         type: shiftDef.type,
+                        color: rotaColor,
                     });
                     iterationStartDate.setDate(iterationStartDate.getDate() + rotaCycleDays);
                     iterationEndDate.setDate(iterationEndDate.getDate() + rotaCycleDays);
@@ -99,14 +123,28 @@ export default function MyCalendarPage() {
     return events.sort((a,b) => a.start.getTime() - b.start.getTime());
   }, [user]);
 
-  const daysWithShifts = useMemo(() => {
-    return allEvents.map(event => event.start);
+  const eventsByDay = useMemo(() => {
+    const grouped = new Map<string, DisplayEvent[]>();
+    allEvents.forEach(event => {
+      const dayKey = format(event.start, 'yyyy-MM-dd');
+      if (!grouped.has(dayKey)) {
+        grouped.set(dayKey, []);
+      }
+      grouped.get(dayKey)!.push(event);
+    });
+    return grouped;
   }, [allEvents]);
 
+  const handleDayClick = useCallback((day: Date) => {
+    setSelectedDate(day);
+  }, []);
+  
   const eventsOnSelectedDay = useMemo(() => {
     if (!selectedDate) return [];
-    return allEvents.filter(event => isSameDay(event.start, selectedDate));
-  }, [allEvents, selectedDate]);
+    const dayKey = format(selectedDate, 'yyyy-MM-dd');
+    return eventsByDay.get(dayKey) || [];
+  }, [eventsByDay, selectedDate]);
+
 
   if (authLoading) {
     return (
@@ -129,51 +167,84 @@ export default function MyCalendarPage() {
 
   return (
     <div className="space-y-8">
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle className="text-3xl font-headline text-primary flex items-center gap-2">
-            <CalendarDays className="h-7 w-7" /> My Calendar
-          </CardTitle>
-          <CardDescription>
-            View your upcoming shifts from all your rotas. Days with scheduled shifts are marked.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col md:flex-row gap-6 md:gap-8 items-start">
-          <div className="w-full md:w-auto border rounded-md p-1 md:p-2 bg-card shadow-sm self-center md:self-start">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={setSelectedDate}
-              className="p-0"
-              modifiers={{ scheduled: daysWithShifts }}
-              modifiersClassNames={{
-                scheduled: 'day-scheduled',
-              }}
-              month={selectedDate}
-              onMonthChange={setSelectedDate}
-              showOutsideDays
-              fixedWeeks
-            />
+      <Card className="shadow-lg bg-card text-card-foreground dark-calendar-theme">
+        <CardHeader className="border-b border-border">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold">{format(currentMonth, 'MMMM yyyy')}</h2>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" onClick={() => setCurrentMonth(startOfMonth(new Date()))}>
+                Today
+              </Button>
+              <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-          <div className="flex-1 w-full">
-            <h3 className="text-xl font-semibold text-primary mb-3 border-b pb-2">
-              Shifts for: {selectedDate ? format(selectedDate, 'PPP') : 'No date selected'}
-            </h3>
+        </CardHeader>
+        <CardContent className="p-0">
+          <DayPicker
+            key={currentMonth.toISOString()} // Force re-render on month change to ensure styles apply correctly
+            mode="single"
+            month={currentMonth}
+            onMonthChange={setCurrentMonth}
+            selected={selectedDate}
+            showOutsideDays
+            fixedWeeks
+            className="rota-calendar"
+            classNames={{
+              table: 'w-full border-collapse',
+              head_row: 'flex border-b border-border',
+              head_cell: 'w-[calc(100%/7)] p-2 text-xs text-muted-foreground text-center font-medium',
+              row: 'flex w-full border-b border-border last:border-b-0',
+              cell: 'w-[calc(100%/7)] border-r border-border last:border-r-0 h-32 sm:h-36 md:h-40 flex flex-col', // Fixed height for day cells
+              day: 'h-full', // Make day button fill the cell
+              day_selected: 'bg-primary/20 text-primary-foreground',
+              day_today: 'bg-accent/20 text-accent-foreground !font-bold',
+              day_outside: 'text-muted-foreground/50 opacity-50',
+            }}
+            components={{
+              Day: (props) => (
+                <CustomCalendarDay
+                  {...props}
+                  events={eventsByDay.get(format(props.date, 'yyyy-MM-dd')) || []}
+                  onDayClick={handleDayClick}
+                  isSelected={selectedDate ? isSameDay(props.date, selectedDate) : false}
+                />
+              ),
+            }}
+          />
+        </CardContent>
+      </Card>
+
+      {selectedDate && (
+        <Card className="shadow-lg mt-6">
+          <CardHeader>
+            <CardTitle className="text-xl text-primary">
+              Shifts for: {format(selectedDate, 'PPP')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
             {eventsOnSelectedDay.length > 0 ? (
-              <ScrollArea className="h-[300px] md:h-[400px] pr-3">
+              <ScrollArea className="h-[200px] pr-3">
                 <ul className="space-y-3">
                   {eventsOnSelectedDay.map(event => (
-                    <li key={event.id} className="p-3 border rounded-lg shadow-sm bg-card hover:bg-muted/50 transition-colors">
-                      <p className="font-semibold text-accent">
-                        {event.title} <span className="text-xs text-muted-foreground">({event.dutyCode})</span>
-                      </p>
-                      <p className="text-sm">
+                    <li key={event.id} className={`p-3 border-l-4 rounded-r-lg shadow-sm bg-card hover:bg-muted/50 transition-colors`} style={{borderColor: event.color?.startsWith('bg-') ? `hsl(var(--${event.color.substring(3).replace('-500','')}))` : event.color}}>
+                       <div className="flex items-center gap-2">
+                         <span className={`h-2.5 w-2.5 rounded-full ${event.color || 'bg-primary'}`} />
+                         <p className="font-semibold text-accent">
+                            {event.title} <span className="text-xs text-muted-foreground">({event.dutyCode})</span>
+                         </p>
+                       </div>
+                      <p className="text-sm ml-5">
                         Time: {format(event.start, 'HH:mm')} - {format(event.end, 'HH:mm')}
                         {event.end < event.start && " (next day)"}
                       </p>
-                      <p className="text-xs text-muted-foreground">Rota: {event.rotaName} ({event.site})</p>
+                      <p className="text-xs text-muted-foreground ml-5">Rota: {event.rotaName} ({event.site})</p>
                       {event.type === 'on-call' && (
-                        <span className="text-xs font-medium text-amber-600 dark:text-amber-500">(On-Call)</span>
+                        <span className="text-xs font-medium text-amber-600 dark:text-amber-500 ml-5">(On-Call)</span>
                       )}
                     </li>
                   ))}
@@ -181,13 +252,14 @@ export default function MyCalendarPage() {
               </ScrollArea>
             ) : (
               <p className="text-muted-foreground mt-4 text-center py-6">
-                {selectedDate ? "No shifts scheduled for this day." : "Select a day to see scheduled shifts."}
+                No shifts scheduled for this day.
               </p>
             )}
-          </div>
-        </CardContent>
-      </Card>
-       {!user.rotas || user.rotas.length === 0 && (
+          </CardContent>
+        </Card>
+      )}
+
+      {!user.rotas || user.rotas.length === 0 && (
          <Card className="mt-6">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-destructive">
@@ -202,3 +274,5 @@ export default function MyCalendarPage() {
     </div>
   );
 }
+
+    
