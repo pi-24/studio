@@ -167,7 +167,7 @@ export default function MyCalendarPage() {
 
   return (
     <div className="space-y-8">
-      <Card className="shadow-lg bg-card text-card-foreground dark-calendar-theme">
+      <Card className="shadow-lg bg-card text-card-foreground">
         <CardHeader className="border-b border-border">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">{format(currentMonth, 'MMMM yyyy')}</h2>
@@ -274,5 +274,3 @@ export default function MyCalendarPage() {
     </div>
   );
 }
-
-    
