@@ -112,7 +112,7 @@ const CATEGORY_ORDER = [
 const WORKING_LIMITS = [
    {
     id: 'avgWeeklyHoursWithLeaveNHS',
-    name: 'Average Weekly Hours (NHS Employers Method)',
+    name: 'Average Weekly Hours (leave included)',
     description: 'Average weekly hours, factoring in leave using NHS Employers guidance, should not exceed 48 hours (or 56 if opted out).',
     pdfReference: 'NHS Employers Prospective Cover Guidance, pg 6',
     category: CATEGORIES.AVERAGE_HOURS,
@@ -1097,4 +1097,5 @@ export async function processRota(data: RotaProcessingInput): Promise<ProcessedR
     estimatedSalary: 0, 
   };
 }
+
 
