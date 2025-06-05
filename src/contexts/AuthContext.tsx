@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { User, UserProfileData, RotaDocument } from '@/types';
+import type { User, UserProfileData, RotaDocument, RotaSpecificScheduleMetadata } from '@/types';
 import React, { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 
@@ -29,7 +29,7 @@ const initializeNewUser = (email: string): User => ({
   hasPostgraduateLoan: false,
   nhsPensionOptIn: true,
   isProfileComplete: false,
-  rotas: [], // Initialize with an empty array for rotas
+  rotas: [], 
 });
 
 
@@ -44,27 +44,76 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const storedUser = localStorage.getItem('rotaCalcUser');
       if (storedUser) {
         const parsedUser: User = JSON.parse(storedUser);
+        
         if (typeof parsedUser.isProfileComplete === 'undefined') {
             parsedUser.isProfileComplete = false; 
         }
-        if (!parsedUser.rotas) { // Ensure rotas array exists
+
+        if (!parsedUser.rotas || !Array.isArray(parsedUser.rotas)) {
             parsedUser.rotas = [];
+        } else {
+            parsedUser.rotas = parsedUser.rotas.map(rota => {
+                // Define a robust default for scheduleMeta
+                const defaultMeta: RotaSpecificScheduleMetadata = {
+                    site: 'N/A', 
+                    specialty: 'N/A',
+                    scheduleStartDate: '1970-01-01', 
+                    endDate: '1970-01-01',
+                    scheduleTotalWeeks: 1, 
+                    wtrOptOut: false,
+                    annualLeaveEntitlement: 0, 
+                    hoursInNormalDay: 8,
+                };
+
+                // Ensure scheduleMeta exists and is an object, otherwise use default
+                const metaIsValid = rota.scheduleMeta && typeof rota.scheduleMeta === 'object';
+                const currentMeta = metaIsValid ? rota.scheduleMeta : defaultMeta;
+
+                return {
+                    id: rota.id || crypto.randomUUID(),
+                    name: rota.name || 'Unnamed Rota',
+                    scheduleMeta: { // Ensure all fields within scheduleMeta are present
+                        site: currentMeta.site || defaultMeta.site,
+                        specialty: currentMeta.specialty || defaultMeta.specialty,
+                        scheduleStartDate: currentMeta.scheduleStartDate || defaultMeta.scheduleStartDate,
+                        endDate: currentMeta.endDate || defaultMeta.endDate,
+                        scheduleTotalWeeks: typeof currentMeta.scheduleTotalWeeks === 'number' ? currentMeta.scheduleTotalWeeks : defaultMeta.scheduleTotalWeeks,
+                        wtrOptOut: typeof currentMeta.wtrOptOut === 'boolean' ? currentMeta.wtrOptOut : defaultMeta.wtrOptOut,
+                        annualLeaveEntitlement: typeof currentMeta.annualLeaveEntitlement === 'number' ? currentMeta.annualLeaveEntitlement : defaultMeta.annualLeaveEntitlement,
+                        hoursInNormalDay: typeof currentMeta.hoursInNormalDay === 'number' ? currentMeta.hoursInNormalDay : defaultMeta.hoursInNormalDay,
+                    },
+                    shiftDefinitions: Array.isArray(rota.shiftDefinitions) ? rota.shiftDefinitions : [],
+                    rotaGrid: typeof rota.rotaGrid === 'object' && rota.rotaGrid !== null ? rota.rotaGrid : {},
+                    createdAt: rota.createdAt || new Date().toISOString(),
+                    complianceSummary: rota.complianceSummary // Stays undefined if not present, which is fine
+                };
+            });
         }
         setUser(parsedUser);
       }
     } catch (error) {
-      console.error("Failed to parse user from localStorage", error);
-      localStorage.removeItem('rotaCalcUser');
+      console.error("Failed to parse user from localStorage or migrate rota structure:", error);
+      // localStorage.removeItem('rotaCalcUser'); // Optionally clear corrupted data
     }
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    if (!loading && user && !user.isProfileComplete && 
-        pathname !== '/profile/setup' && 
-        pathname !== '/login' && 
-        pathname !== '/signup') {
-      router.push('/profile/setup');
+    if (loading) return;
+
+    if (user) {
+      if (!user.isProfileComplete && pathname !== '/profile/setup' && pathname !== '/login' && pathname !== '/signup') {
+        router.push('/profile/setup');
+      } else if (user.isProfileComplete && (pathname === '/login' || pathname === '/signup')) {
+        router.push('/');
+      }
+    } else { // No user
+      if (pathname !== '/login' && pathname !== '/signup') {
+        // Allow access to /profile/setup only if it were a public "start here" page for all,
+        // but since it's post-signup, it shouldn't be accessed without a user.
+        // So, any non-login/signup page without a user redirects to login.
+        router.push('/login');
+      }
     }
   }, [user, loading, router, pathname]);
 
@@ -76,8 +125,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const parsed: User = JSON.parse(storedUser);
         if (parsed.email === email) { 
             existingUser = parsed;
+            // Ensure backward compatibility for isProfileComplete and rotas
             if (typeof existingUser.isProfileComplete === 'undefined') existingUser.isProfileComplete = false;
             if (!existingUser.rotas) existingUser.rotas = [];
+            // Potentially re-run the robust mapping for rotas here if concerned about old data format
+            // For simplicity, assuming the main useEffect handles parsing on initial load
         }
       }
     } catch (error) {
@@ -97,7 +149,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } else {
       router.push('/');
     }
-  }, [router, initializeNewUser]);
+  }, [router]);
 
   const signup = useCallback((email: string) => {
     const newUser = initializeNewUser(email);
@@ -108,13 +160,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("Failed to set user in localStorage during signup", error);
     }
     router.push('/profile/setup'); 
-  }, [router, initializeNewUser]);
+  }, [router]);
 
   const logout = useCallback(() => {
     setUser(null);
     try {
       localStorage.removeItem('rotaCalcUser');
-    } catch (error) {
+    } catch (error)
       console.error("Failed to remove user from localStorage", error);
     }
     router.push('/login');
@@ -123,8 +175,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const updateUserProfile = useCallback((updatedData: Partial<UserProfileData>) => {
     setUser(prevUser => {
       if (!prevUser) return null;
-      // Ensure rotas array is preserved if not part of updatedData
-      const newRotas = updatedData.rotas || prevUser.rotas;
+      const newRotas = updatedData.rotas || prevUser.rotas; // Preserve rotas if not in updatedData
       const newUser = { ...prevUser, ...updatedData, rotas: newRotas };
       try {
         localStorage.setItem('rotaCalcUser', JSON.stringify(newUser));
@@ -174,3 +225,5 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     </AuthContext.Provider>
   );
 };
+
+    
