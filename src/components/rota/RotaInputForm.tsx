@@ -10,11 +10,11 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { CalendarDays, Send, XCircle, AlertCircle as AlertIconLucide } from 'lucide-react';
+import { CalendarDays, Send, XCircle, AlertCircle as AlertIconLucide, Edit } from 'lucide-react';
 import type { RotaInput, ProcessedRotaResult, ShiftDefinition, ScheduleMetadata, RotaGridInput } from '@/types';
-import { processRota } from '@/app/actions';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
+import Link from 'next/link';
 
 // Schema for the rota grid part of the form
 const rotaGridFormSchema = z.object({
@@ -24,70 +24,80 @@ const rotaGridFormSchema = z.object({
 type RotaGridFormValues = z.infer<typeof rotaGridFormSchema>;
 
 interface RotaInputFormProps {
-  scheduleMeta: ScheduleMetadata | undefined; // Now passed as prop
-  shiftDefinitions: ShiftDefinition[] | undefined; // Now passed as prop
-  onProcessRota: (result: ProcessedRotaResult | { error: string; fieldErrors?: z.ZodIssue[] } | null) => void;
+  scheduleMeta: ScheduleMetadata; 
+  shiftDefinitions: ShiftDefinition[];
+  initialRotaGrid?: RotaGridInput; // For pre-filling the grid
+  onProcessRota: (fullRotaInput: RotaInput) => Promise<void>; // Expects the full input
   isProcessing: boolean;
   setIsProcessing: (isProcessing: boolean) => void;
 }
 
-export default function RotaInputForm({ scheduleMeta, shiftDefinitions, onProcessRota, isProcessing, setIsProcessing }: RotaInputFormProps) {
+export default function RotaInputForm({ 
+    scheduleMeta, 
+    shiftDefinitions, 
+    initialRotaGrid, 
+    onProcessRota, 
+    isProcessing, 
+    setIsProcessing 
+}: RotaInputFormProps) {
   const { toast } = useToast();
 
   const { control, handleSubmit, reset, formState: { errors: formErrors }, setError: setFormError } = useForm<RotaGridFormValues>({
     resolver: zodResolver(rotaGridFormSchema),
     defaultValues: {
-      rotaGrid: {},
+      rotaGrid: initialRotaGrid || {},
     },
   });
+
+  useEffect(() => {
+    reset({ rotaGrid: initialRotaGrid || {} });
+  }, [initialRotaGrid, reset]);
+
 
   const onSubmitGrid: SubmitHandler<RotaGridFormValues> = async (data) => {
     if (!scheduleMeta || !shiftDefinitions || shiftDefinitions.length === 0) {
       toast({ title: "Missing Configuration", description: "Schedule setup or shift definitions are missing. Please complete your profile.", variant: "destructive" });
-      onProcessRota({ error: "Schedule setup or shift definitions are missing." });
+      // onProcessRota callback expects a RotaInput, but here we have an error state.
+      // The parent component (RotaCheckerPage) should handle this display.
       return;
     }
 
-    setIsProcessing(true);
     const fullRotaInput: RotaInput = {
       scheduleMeta,
       shiftDefinitions,
       rotaGrid: data.rotaGrid,
     };
-    const result = await processRota(fullRotaInput);
-    onProcessRota(result);
-    setIsProcessing(false);
-
-    if ('error' in result) {
-      toast({ title: "Processing Error", description: result.error, variant: "destructive" });
-      if (result.fieldErrors) {
-        result.fieldErrors.forEach(fieldError => {
-          const path = fieldError.path.join('.') as any;
-          setFormError(path, { type: 'server', message: fieldError.message });
-        });
-      }
-    } else {
-      toast({ title: "Rota Processed", description: "Compliance checks complete.", variant: "default" });
-    }
+    await onProcessRota(fullRotaInput); // Parent handles setting results and errors
   };
   
   const handleClearGrid = () => {
     reset({ rotaGrid: {} });
-    onProcessRota(null); // Clear results view
-    toast({ title: "Rota Grid Cleared", description: "Your rota inputs have been reset." });
+    // Inform parent to clear results if needed, or parent can derive from empty grid
+    const clearedFullRotaInput: RotaInput = {
+        scheduleMeta,
+        shiftDefinitions,
+        rotaGrid: {}
+    };
+    onProcessRota(clearedFullRotaInput); 
+    toast({ title: "Rota Grid Cleared", description: "Your rota inputs have been reset. Click 'Calculate & Check' to re-process." });
   };
   
   const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   if (!scheduleMeta || !shiftDefinitions) {
+    // This case should ideally be handled by the parent page (e.g., RotaCheckerPage)
+    // by not rendering this form or showing a message.
     return (
         <Card className="w-full shadow-lg my-8">
             <CardHeader>
                 <CardTitle className="text-2xl font-headline flex items-center gap-2"><CalendarDays className="text-primary"/>Input Weekly Rota</CardTitle>
-                <CardDescription>Loading schedule configuration...</CardDescription>
+                <CardDescription>Loading schedule configuration or configuration missing...</CardDescription>
             </CardHeader>
             <CardContent>
-                <p className="text-muted-foreground text-center py-6">Please complete your profile setup to configure schedule parameters and shift types.</p>
+                <p className="text-muted-foreground text-center py-6">
+                    Schedule configuration or shift types are missing. 
+                    Please <Link href="/profile" className="underline text-primary">update your profile</Link>.
+                </p>
             </CardContent>
         </Card>
     );
@@ -96,13 +106,18 @@ export default function RotaInputForm({ scheduleMeta, shiftDefinitions, onProces
   return (
     <Card className="w-full shadow-lg my-8">
       <CardHeader>
-        <CardTitle className="text-2xl font-headline flex items-center gap-2"><CalendarDays className="text-primary"/>Input Weekly Rota</CardTitle>
-        <CardDescription>Select the defined shift for each day of your rota cycle. Schedule configuration and shift types are managed in your profile.</CardDescription>
+        <CardTitle className="text-2xl font-headline flex items-center gap-2"><CalendarDays className="text-primary"/>Input/Edit Weekly Rota</CardTitle>
+        <CardDescription>
+            Select the defined shift for each day of your rota cycle. 
+            Schedule configuration (weeks, start date) and shift types are managed in your <Link href="/profile" className="underline text-primary hover:text-primary/80">profile</Link>.
+        </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmitGrid)}>
         <CardContent className="space-y-6">
           {shiftDefinitions.length === 0 || shiftDefinitions.every(d => !d.dutyCode) ? (
-                <p className="text-amber-500 flex items-center"><AlertIconLucide size={18} className="mr-2"/>No shift types defined. Please add shift definitions in your profile.</p>
+                <div className="p-4 text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded-md">
+                    <p className="flex items-center"><AlertIconLucide size={18} className="mr-2"/>No shift types defined. Please <Link href="/profile" className="font-semibold underline hover:text-amber-700 dark:hover:text-amber-400">add shift definitions in your profile</Link>.</p>
+                </div>
             ) : (
             <div className="overflow-x-auto custom-scrollbar">
                 <table className="min-w-full divide-y divide-border border border-border">
@@ -121,13 +136,13 @@ export default function RotaInputForm({ scheduleMeta, shiftDefinitions, onProces
                                         <Controller
                                             name={`rotaGrid.week_${weekIndex}_day_${dayIndex}`}
                                             control={control}
-                                            defaultValue=""
                                             render={({ field }) => (
                                                 <Select onValueChange={field.onChange} value={field.value || ""}>
                                                     <SelectTrigger className="w-full min-w-[100px] sm:min-w-[120px] h-9 text-xs">
                                                         <SelectValue placeholder="OFF" />
                                                     </SelectTrigger>
                                                     <SelectContent>
+                                                        {/* Placeholder handles "OFF" display when value is "" */}
                                                         {shiftDefinitions.filter(d => d.dutyCode).map(def => (
                                                             <SelectItem key={def.id} value={def.dutyCode}>
                                                                 {def.dutyCode} - {def.name.substring(0,12)}{def.name.length > 12 ? '...' : ''}
@@ -158,7 +173,7 @@ export default function RotaInputForm({ scheduleMeta, shiftDefinitions, onProces
                     <AlertDialogHeader>
                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        This will reset all rota inputs in the grid above. Schedule setup and shift definitions will remain. This action cannot be undone for the grid.
+                        This will reset all your rota inputs in the grid above. This action cannot be undone for the grid data.
                     </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

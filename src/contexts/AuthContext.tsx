@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { User, UserProfileData } from '@/types';
+import type { User, UserProfileData, RotaGridInput } from '@/types';
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 
@@ -26,6 +26,7 @@ const defaultScheduleMeta = {
 
 const defaultShiftDefinitions = [{ id: crypto.randomUUID(), dutyCode: 'S1', name: 'Standard Day', type: 'normal' as 'normal' | 'on-call', startTime: '09:00', finishTime: '17:00', durationStr: '8h 0m' }];
 
+const defaultRotaGrid: RotaGridInput = {};
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -45,6 +46,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!parsedUser.shiftDefinitions) {
           parsedUser.shiftDefinitions = defaultShiftDefinitions;
         }
+        if (!parsedUser.rotaGrid) { // Add default for rotaGrid
+            parsedUser.rotaGrid = defaultRotaGrid;
+        }
         setUser(parsedUser);
       }
     } catch (error) {
@@ -61,7 +65,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [user, loading, router, pathname]);
 
   const initializeNewUser = (email: string): User => ({
-    id: crypto.randomUUID(), // More robust ID generation if needed
+    id: crypto.randomUUID(), 
     email,
     grade: undefined,
     region: undefined,
@@ -72,6 +76,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isProfileComplete: false,
     scheduleMeta: defaultScheduleMeta,
     shiftDefinitions: defaultShiftDefinitions,
+    rotaGrid: defaultRotaGrid, // Initialize rotaGrid
   });
 
   const login = (email: string) => {
@@ -80,14 +85,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const storedUser = localStorage.getItem('rotaCalcUser');
       if (storedUser) {
         const parsed = JSON.parse(storedUser);
-        if (parsed.email === email) { // Rudimentary check, replace with real auth
+        if (parsed.email === email) { 
             existingUser = parsed;
-             // Ensure essential defaults if profile is incomplete from an older version
             if (!existingUser.scheduleMeta) {
               existingUser.scheduleMeta = defaultScheduleMeta;
             }
             if (!existingUser.shiftDefinitions) {
               existingUser.shiftDefinitions = defaultShiftDefinitions;
+            }
+            if (!existingUser.rotaGrid) { // Ensure rotaGrid exists
+                existingUser.rotaGrid = defaultRotaGrid;
             }
         }
       }
@@ -118,7 +125,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error("Failed to set user in localStorage during signup", error);
     }
-    router.push('/profile/setup'); // New users always go to setup
+    router.push('/profile/setup'); 
   };
 
   const logout = () => {

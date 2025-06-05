@@ -1,5 +1,4 @@
 
-
 export type UserGrade = 'F1' | 'F2' | 'CT1' | 'CT2' | 'CT3+' | 'ST1' | 'ST2' | 'ST3+' | 'SpecialtyDoctor' | 'Consultant' | 'Other';
 export type UKRegion = 'London' | 'SouthEast' | 'SouthWest' | 'EastOfEngland' | 'Midlands' | 'NorthEastAndYorkshire' | 'NorthWest' | 'Scotland' | 'Wales' | 'NorthernIreland' | 'Other';
 
@@ -21,6 +20,11 @@ export interface ShiftDefinition {
   durationStr: string; // e.g., "8h 0m"
 }
 
+// Represents the user's input for the rota grid
+export interface RotaGridInput {
+  [weekDayKey: string]: string; // e.g., "week_0_day_0": "S1"
+}
+
 export interface UserProfileData {
   grade?: UserGrade;
   region?: UKRegion;
@@ -31,16 +35,12 @@ export interface UserProfileData {
   isProfileComplete: boolean;
   scheduleMeta?: ScheduleMetadata;
   shiftDefinitions?: ShiftDefinition[];
+  rotaGrid?: RotaGridInput; // Added rotaGrid
 }
 
 export interface User extends UserProfileData {
   id: string;
   email: string;
-}
-
-// Represents the user's input for the rota grid
-export interface RotaGridInput {
-  [weekDayKey: string]: string; // e.g., "week_0_day_0": "S1"
 }
 
 export interface RotaInput {

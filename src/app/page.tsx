@@ -1,33 +1,19 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
-import RotaInputForm from '@/components/rota/RotaInputForm';
-import ComplianceReport from '@/components/rota/ComplianceReport';
-import type { ProcessedRotaResult, RotaInput, User } from '@/types';
-import { useAuth } from '@/hooks/useAuth';
+import { useEffect } from 'react';
 import Link from 'next/link';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRight, LogIn, AlertTriangle, Settings } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AlertTriangle, Settings, ListChecks, CreditCard, ExternalLink } from 'lucide-react';
 
-export default function HomePage() {
-  const [rotaResult, setRotaResult] = useState<ProcessedRotaResult | { error: string; fieldErrors?: any[] } | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
 
-  useEffect(() => {
-    // Clear results if user changes or logs out
-    setRotaResult(null);
-  }, [user]);
-  
-  const handleProcessRota = (result: ProcessedRotaResult | { error: string; fieldErrors?: any[] } | null) => {
-    setRotaResult(result);
-  };
-
   if (authLoading) {
-    return ( // Skeleton for loading state
+    return (
       <div className="space-y-8">
         <Card className="w-full shadow-lg">
           <CardHeader><Skeleton className="h-8 w-3/4 mb-2" /><Skeleton className="h-4 w-1/2" /></CardHeader>
@@ -35,43 +21,30 @@ export default function HomePage() {
             <Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-1/4 mt-4" />
           </CardContent>
         </Card>
-         <Card className="w-full shadow-lg mt-8"><CardHeader><Skeleton className="h-8 w-1/2 mb-2" /></CardHeader>
-          <CardContent className="space-y-4"><Skeleton className="h-20 w-full" /><Skeleton className="h-20 w-full" /></CardContent>
-        </Card>
       </div>
     );
   }
 
-  if (!user) { // User not logged in
+  // AuthContext handles redirection if user is null or profile is incomplete
+  if (!user) {
+    // This part should ideally not be reached if AuthContext is working correctly,
+    // but as a fallback:
     return (
-      <div className="flex flex-col items-center justify-center text-center py-12 sm:py-24">
-        <Card className="w-full max-w-2xl p-8 sm:p-12 shadow-xl">
-          <CardHeader className="mb-6">
-            <h1 className="text-4xl sm:text-5xl font-bold font-headline text-primary mb-4">Welcome to RotaCalc</h1>
-            <CardDescription className="text-lg sm:text-xl text-muted-foreground">
-              Effortlessly manage your NHS rota, check compliance, and estimate your salary.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <p className="text-md text-foreground">Get started by logging in or creating an account.</p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button asChild size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                <Link href="/login"><LogIn className="mr-2 h-5 w-5" /> Login</Link>
-              </Button>
-              <Button asChild variant="outline" size="lg">
-                <Link href="/signup">Sign Up <ArrowRight className="ml-2 h-5 w-5" /></Link>
-              </Button>
-            </div>
+      <div className="flex flex-col items-center justify-center text-center py-12">
+         <Card className="w-full max-w-md p-8 shadow-lg">
+           <CardHeader>
+             <CardTitle className="text-2xl text-primary">Loading...</CardTitle>
+           </CardHeader>
+          <CardContent>
+            <p>Redirecting to login...</p>
           </CardContent>
-        </Card>
+         </Card>
       </div>
     );
   }
-
-  // User is logged in, check if profile is complete
-  // AuthContext should redirect to /profile/setup if not complete,
-  // but as a fallback or if redirection is still pending:
-  if (!user.isProfileComplete) {
+  
+   if (!user.isProfileComplete) {
+     // Also should be handled by AuthContext, but good to have a fallback UI
     return (
       <div className="flex flex-col items-center justify-center text-center py-12">
         <Card className="w-full max-w-md p-8 shadow-lg">
@@ -82,7 +55,7 @@ export default function HomePage() {
             <CardDescription>Please complete your profile setup to use RotaCalc.</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="mb-6">Your profile information, schedule settings, and shift types need to be configured.</p>
+            <p className="mb-6">Your profile information needs to be configured before you can access the dashboard.</p>
             <Button asChild size="lg">
               <Link href="/profile/setup">
                 <Settings className="mr-2 h-5 w-5" /> Go to Profile Setup
@@ -94,32 +67,86 @@ export default function HomePage() {
     );
   }
   
-  // Profile is complete, this is the "Dashboard" area for now
-  // Eventually, this page will have navigation to Rota Checker / Pay Checker
+  const isRotaGridEmpty = !user.rotaGrid || Object.keys(user.rotaGrid).length === 0;
+
   return (
-    <div className="space-y-8">
-      <Card>
+    <div className="space-y-10">
+      <Card className="shadow-lg border-primary/20">
         <CardHeader>
-            <CardTitle className="text-2xl font-headline text-primary">Rota Compliance Checker</CardTitle>
-            <CardDescription>Input your rota grid below. Your schedule settings and shift definitions are taken from your profile.</CardDescription>
+          <CardTitle className="text-3xl font-headline text-primary">Welcome to RotaCalc, {user.email}!</CardTitle>
+          <CardDescription className="text-md">
+            This is your dashboard. Access tools and manage your rota information from here.
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-             {(!user.scheduleMeta || !user.shiftDefinitions || user.shiftDefinitions.length === 0) && (
-                <div className="p-4 mb-4 text-sm text-yellow-700 bg-yellow-100 rounded-lg dark:bg-yellow-200 dark:text-yellow-800" role="alert">
-                    <span className="font-medium">Configuration Needed:</span> Schedule settings or shift definitions are missing from your profile. 
-                    Please <Link href="/profile" className="font-semibold underline hover:text-yellow-800">update your profile</Link>.
+        {isRotaGridEmpty && (
+             <CardContent>
+                <div className="p-4 mb-2 text-sm text-yellow-700 bg-yellow-100 rounded-lg dark:bg-yellow-200 dark:text-yellow-800" role="alert">
+                    <span className="font-medium">Rota Not Entered:</span> You haven't entered your rota schedule yet. 
+                    You can do this via the <Link href="/profile/setup" className="font-semibold underline hover:text-yellow-800">profile setup</Link> (if completing for the first time) or by visiting the Rota Compliance Checker tool.
                 </div>
-            )}
-            <RotaInputForm 
-                scheduleMeta={user.scheduleMeta}
-                shiftDefinitions={user.shiftDefinitions}
-                onProcessRota={handleProcessRota} 
-                isProcessing={isProcessing}
-                setIsProcessing={setIsProcessing}
-            />
-        </CardContent>
+            </CardContent>
+        )}
       </Card>
-      <ComplianceReport result={rotaResult} isProcessing={isProcessing} />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="hover:shadow-xl transition-shadow">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-xl text-accent">
+              <ListChecks className="h-6 w-6"/> Rota Compliance Checker
+            </CardTitle>
+            <CardDescription>
+              Analyze your rota against NHS compliance rules. View and edit your current rota schedule.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+              <Link href="/rota-checker">
+                Open Rota Checker <ExternalLink className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+             {isRotaGridEmpty && (
+                <p className="text-xs text-amber-600 dark:text-amber-500 mt-3">
+                    Your rota grid is currently empty. Please input your rota in the checker.
+                </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-xl transition-shadow">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-xl text-primary">
+              <CreditCard className="h-6 w-6"/> Pay Checker
+            </CardTitle>
+            <CardDescription>
+              Estimate your salary based on your rota and NHS pay scales. (Coming Soon)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button disabled className="w-full">
+              Open Pay Checker (Coming Soon)
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+       <Card className="mt-10 shadow-lg">
+            <CardHeader>
+                <CardTitle className="text-xl font-semibold text-primary flex items-center gap-2">
+                    <Settings className="h-5 w-5" /> Manage Your Profile
+                </CardTitle>
+                <CardDescription>
+                    Update your personal details, rota configuration, shift types, and saved rota schedule.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Button asChild variant="outline">
+                    <Link href="/profile">
+                        Go to Profile <ExternalLink className="ml-2 h-4 w-4" />
+                    </Link>
+                </Button>
+            </CardContent>
+        </Card>
+
     </div>
   );
 }
