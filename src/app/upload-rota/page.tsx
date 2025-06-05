@@ -130,7 +130,7 @@ export default function UploadRotaPage() {
       if (def && typeof def.startTime === 'string' && typeof def.finishTime === 'string') {
         const newDuration = calculateShiftDurationString(def.startTime, def.finishTime);
         if (def.durationStr !== newDuration) {
-          setValue(`shiftDefinitions.${index}.durationStr`, newDuration, { shouldValidate: false, shouldDirty: false });
+          setValue(`shiftDefinitions.${index}.durationStr`, newDuration, { shouldValidate: false, shouldDirty: true });
         }
       }
     });
@@ -189,10 +189,9 @@ export default function UploadRotaPage() {
     } catch (error) {
         console.error("Error during rota processing or saving:", error);
         toast({ title: "Error", description: "Failed to save or process the rota. Please try again.", variant: "destructive"});
-        // Save rota even if processing fails, without compliance summary
         const newRotaDocument: RotaDocument = { ...rotaDocumentBase, complianceSummary: undefined };
         addRotaDocument(newRotaDocument);
-        router.push('/'); // Or redirect to a page indicating partial success
+        router.push('/'); 
     } finally {
         setIsSavingAndProcessing(false);
     }
