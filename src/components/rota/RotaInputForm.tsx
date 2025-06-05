@@ -49,7 +49,7 @@ const rotaFormSchema = z.object({
 type RotaFormValues = z.infer<typeof rotaFormSchema>;
 
 interface RotaInputFormProps {
-  onProcessRota: (result: ProcessedRotaResult | { error: string; fieldErrors?: z.ZodIssue[] }) => void;
+  onProcessRota: (result: ProcessedRotaResult | { error: string; fieldErrors?: z.ZodIssue[] } | null) => void;
   isProcessing: boolean;
   setIsProcessing: (isProcessing: boolean) => void;
 }
@@ -351,7 +351,7 @@ export default function RotaInputForm({ onProcessRota, isProcessing, setIsProces
                                                         <SelectValue placeholder="OFF" />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        <SelectItem value="">OFF</SelectItem>
+                                                        {/* The <SelectItem value="">OFF</SelectItem> was removed from here */}
                                                         {shiftDefinitionsValues.filter(d => d.dutyCode).map(def => (
                                                             <SelectItem key={def.id} value={def.dutyCode}>
                                                                 {def.dutyCode} - {def.name.substring(0,12)}{def.name.length > 12 ? '...' : ''}
