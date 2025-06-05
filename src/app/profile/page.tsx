@@ -6,11 +6,12 @@ import { useForm, useFieldArray, Controller, SubmitHandler } from 'react-hook-fo
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link'; // Added import
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { UserCircle, Mail, LogOut, Briefcase, MapPin, Percent, Landmark, ShieldCheck, Settings2, Trash2, PlusCircle, Save, CalendarDays, ExternalLink } from 'lucide-react';
+import { UserCircle, Mail, LogOut, Briefcase, MapPin, Percent, Landmark, ShieldCheck, Settings2, Trash2, PlusCircle, Save, CalendarDays, ExternalLink, Edit } from 'lucide-react'; // Added Edit
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -55,7 +56,7 @@ const profileEditSchema = z.object({
       message: 'Duty Codes must be unique',
       path: ['shiftDefinitions'] 
     }).optional(),
-  rotaGrid: rotaGridSchema.optional(), // Added for completeness, though not directly editable here
+  rotaGrid: rotaGridSchema.optional(),
 });
 
 type ProfileEditFormValues = z.infer<typeof profileEditSchema>;
@@ -88,7 +89,7 @@ export default function ProfilePage() {
 
   const { control, handleSubmit, register, formState: { errors, isSubmitting, isDirty }, reset, watch, setValue } = useForm<ProfileEditFormValues>({
     resolver: zodResolver(profileEditSchema),
-    defaultValues: {}, // Default values will be set by useEffect based on user
+    defaultValues: {},
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -118,7 +119,7 @@ export default function ProfilePage() {
         nhsPensionOptIn: user.nhsPensionOptIn === undefined ? true : user.nhsPensionOptIn,
         scheduleMeta: user.scheduleMeta || defaultScheduleMetaValues,
         shiftDefinitions: user.shiftDefinitions && user.shiftDefinitions.length > 0 ? user.shiftDefinitions : defaultShiftDefinitionsValues,
-        rotaGrid: user.rotaGrid || {}, // For display, not directly edited here
+        rotaGrid: user.rotaGrid || {},
       });
     }
   }, [user, authLoading, router, reset]);
@@ -139,17 +140,13 @@ export default function ProfilePage() {
 
   const onSubmit: SubmitHandler<ProfileEditFormValues> = (data) => {
     if (user) {
-      // Exclude rotaGrid from the direct update data as it's not edited on this form directly.
-      // It's managed via RotaChecker or ProfileSetup.
-      const { rotaGrid, ...editableProfileData } = data;
-      
       const profileUpdateData: Partial<UserProfileData> = {
-        ...editableProfileData,
-        isProfileComplete: true, // Ensure profile is marked complete if edited
+        ...data, // rotaGrid will be included if it's part of 'data' from the form
+        isProfileComplete: true,
       };
       updateUserProfile(profileUpdateData);
       toast({ title: "Profile Updated", description: "Your changes have been saved." });
-      reset(editableProfileData as ProfileEditFormValues); // Reset form with new default values to clear isDirty state
+      reset(data); 
     }
   };
 
@@ -174,7 +171,9 @@ export default function ProfilePage() {
 
   const userInitial = user.email ? user.email.charAt(0).toUpperCase() : '?';
   const shiftDefMap = user.shiftDefinitions?.reduce((acc, def) => {
-    acc[def.dutyCode] = def.name;
+    if (def && def.dutyCode) {
+      acc[def.dutyCode] = def.name;
+    }
     return acc;
   }, {} as Record<string, string>) || {};
 
@@ -312,7 +311,7 @@ export default function ProfilePage() {
               </div>
               {errors.shiftDefinitions && errors.shiftDefinitions.root && <p className="text-sm text-destructive mt-1">{errors.shiftDefinitions.root.message}</p>}
               {Array.isArray(errors.shiftDefinitions) && errors.shiftDefinitions.map((err, i) => (
-                Object.values(err || {}).map((fieldError: any) => fieldError && <p key={`${i}-${fieldError.message}`} className="text-sm text-destructive mt-1">{fieldError.message}</p>)
+                err && typeof err === 'object' && Object.values(err).map((fieldError: any) => fieldError && typeof fieldError === 'object' && fieldError.message && <p key={`${i}-${fieldError.message}`} className="text-sm text-destructive mt-1">{fieldError.message}</p>)
               ))}
               <Button type="button" variant="outline" onClick={addShiftDefinition}><PlusCircle className="mr-2 h-4 w-4" /> Add Shift Type</Button>
             </section>
