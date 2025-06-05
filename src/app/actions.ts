@@ -52,31 +52,33 @@ const isTCSNightShift = (shiftStart: string | Date, shiftEnd: string | Date): bo
 
 
 const isWeekendShift = (shift: ProcessedShift): boolean => {
-  const start = new Date(shift.start);
-  const end = new Date(shift.end);
+  const shiftStartObj = new Date(shift.start);
+  const shiftEndObj = new Date(shift.end);
 
-  if (isNaN(start.getTime()) || isNaN(end.getTime())) return false;
+  if (isNaN(shiftStartObj.getTime()) || isNaN(shiftEndObj.getTime())) return false;
 
-  let current = new Date(start);
-  current.setHours(0,0,0,0);
+  let currentDayIter = new Date(shiftStartObj);
+  currentDayIter.setHours(0, 0, 0, 0); 
 
-  const endDay = new Date(end);
-  endDay.setHours(23,59,59,999);
+  const finalDayOfShift = new Date(shiftEndObj);
+  if (shiftEndObj.getHours() === 0 && shiftEndObj.getMinutes() === 0 && shiftStartObj.toDateString() !== shiftEndObj.toDateString()) {
+    finalDayOfShift.setDate(finalDayOfShift.getDate() - 1);
+  }
+  finalDayOfShift.setHours(23, 59, 59, 999); 
 
-  while (current <= endDay) {
-    const dayOfWeek = current.getDay();
-    if (dayOfWeek === 0 || dayOfWeek === 6) { // 0 = Sunday, 6 = Saturday
-      const shiftStartTime = new Date(shift.start).getTime();
-      const shiftEndTime = new Date(shift.end).getTime();
-      
-      const weekendDayStart = new Date(current).setHours(0,0,0,0);
-      const weekendDayEnd = new Date(current).setHours(23,59,59,999);
+  while (currentDayIter.getTime() <= finalDayOfShift.getTime()) {
+    const dayOfWeek = currentDayIter.getDay(); 
+    if (dayOfWeek === 0 || dayOfWeek === 6) { 
+      const weekendCalendarDayStart = new Date(currentDayIter); 
+      weekendCalendarDayStart.setHours(0, 0, 0, 0);
+      const weekendCalendarDayEnd = new Date(currentDayIter);
+      weekendCalendarDayEnd.setHours(23, 59, 59, 999);
 
-      if (Math.max(shiftStartTime, weekendDayStart) < Math.min(shiftEndTime, weekendDayEnd)) {
-        return true;
+      if (Math.max(shiftStartObj.getTime(), weekendCalendarDayStart.getTime()) < Math.min(shiftEndObj.getTime(), weekendCalendarDayEnd.getTime())) {
+        return true; 
       }
     }
-    current.setDate(current.getDate() + 1);
+    currentDayIter.setDate(currentDayIter.getDate() + 1);
   }
   return false;
 };
@@ -833,29 +835,34 @@ const WORKING_LIMITS = [
         const weekendsWorked = new Set<string>();
         shifts.forEach(shift => {
             if (isWeekendShift(shift)) {
-                const shiftStartDate = new Date(shift.start);
-                const dayOfWeek = shiftStartDate.getDay();
-                const saturdayDate = new Date(shiftStartDate);
-                saturdayDate.setDate(shiftStartDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -1 : 6));
-                saturdayDate.setHours(0,0,0,0);
-                weekendsWorked.add(saturdayDate.toISOString().split('T')[0]);
+                const shiftActualStart = new Date(shift.start);
+                const dayOfWeekOfShiftStart = shiftActualStart.getDay(); 
+    
+                const saturdayKeyDate = new Date(shiftActualStart);
+                saturdayKeyDate.setHours(0, 0, 0, 0); 
+                saturdayKeyDate.setDate(saturdayKeyDate.getDate() - dayOfWeekOfShiftStart + (dayOfWeekOfShiftStart === 0 ? -1 : 6));
+                
+                weekendsWorked.add(saturdayKeyDate.toISOString().split('T')[0]);
             }
         });
         
         const numWeekendsWorked = weekendsWorked.size;
-        const totalWeekendsInSchedule = scheduleWeeks;
+        const totalWeekendsInSchedule = scheduleWeeks; // This is the rota cycle length
         
         let frequencyText = 'N/A';
+        let calculatedFrequencyRatio = Infinity; // Higher is better (less frequent)
+
         if (numWeekendsWorked > 0 && totalWeekendsInSchedule > 0) {
-          frequencyText = `1 in ${(totalWeekendsInSchedule / numWeekendsWorked).toFixed(1)}`;
+          calculatedFrequencyRatio = totalWeekendsInSchedule / numWeekendsWorked;
+          frequencyText = `1 in ${calculatedFrequencyRatio.toFixed(1)}`;
         } else if (numWeekendsWorked === 0) {
           frequencyText = '0 weekends worked';
         }
 
-        const violates1in3Guideline = numWeekendsWorked > 0 && totalWeekendsInSchedule > 0 ? (totalWeekendsInSchedule / numWeekendsWorked) < 3 : false;
-        const violates1in2AbsoluteMax = numWeekendsWorked > 0 && totalWeekendsInSchedule > 0 ? (totalWeekendsInSchedule / numWeekendsWorked) < 2 : false;
+        const violates1in3Guideline = numWeekendsWorked > 0 && calculatedFrequencyRatio < 3;
+        const violates1in2AbsoluteMax = numWeekendsWorked > 0 && calculatedFrequencyRatio < 2;
         
-        const isActuallyViolated = violates1in3Guideline; // Flag violation if 1-in-3 guideline is breached.
+        const isActuallyViolated = violates1in3Guideline; 
         let violationSummary = '';
 
         if (violates1in2AbsoluteMax) {
@@ -864,13 +871,13 @@ const WORKING_LIMITS = [
             violationSummary = 'Exceeds 1 in 3 guidance.';
         }
         
-        const details = `Worked ${numWeekendsWorked} weekends in ${totalWeekendsInSchedule} weeks (${frequencyText}).`;
+        const details = `Worked ${numWeekendsWorked} weekends in ${totalWeekendsInSchedule}-week cycle (${frequencyText}).`;
         
         return {
             isViolated: isActuallyViolated,
             userValue: frequencyText, 
             limitValue: '1 in 3 (max 1 in 2)',
-            difference: violationSummary || 'Met', 
+            difference: violationSummary || (numWeekendsWorked === 0 ? 'No weekends worked' : 'Met'), 
             details,
         };
     },
@@ -950,6 +957,9 @@ const rotaInputSchema = z.object({
     wtrOptOut: z.boolean(),
     scheduleTotalWeeks: z.number().min(1).max(52),
     scheduleStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // Added endDate to scheduleMeta for processing
+    site: z.string(), // Added site
+    specialty: z.string(), // Added specialty
     annualLeaveEntitlement: z.number().min(0),
     hoursInNormalDay: z.number().min(0).max(24),
   }),
@@ -1060,3 +1070,4 @@ export async function processRota(data: RotaInput): Promise<ProcessedRotaResult 
   };
 }
 
+    
