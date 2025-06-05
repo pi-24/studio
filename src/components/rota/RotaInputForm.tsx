@@ -30,6 +30,7 @@ interface RotaInputFormProps {
   onProcessRota: (fullRotaInput: RotaInput) => Promise<void>; // Expects the full input
   isProcessing: boolean;
   setIsProcessing: (isProcessing: boolean) => void;
+  isEditing: boolean; // New prop to control edit mode
 }
 
 export default function RotaInputForm({ 
@@ -38,7 +39,8 @@ export default function RotaInputForm({
     initialRotaGrid, 
     onProcessRota, 
     isProcessing, 
-    setIsProcessing 
+    setIsProcessing,
+    isEditing // Destructure new prop
 }: RotaInputFormProps) {
   const { toast } = useToast();
 
@@ -57,8 +59,6 @@ export default function RotaInputForm({
   const onSubmitGrid: SubmitHandler<RotaGridFormValues> = async (data) => {
     if (!scheduleMeta || !shiftDefinitions || shiftDefinitions.length === 0) {
       toast({ title: "Missing Configuration", description: "Schedule setup or shift definitions are missing. Please complete your profile.", variant: "destructive" });
-      // onProcessRota callback expects a RotaInput, but here we have an error state.
-      // The parent component (RotaCheckerPage) should handle this display.
       return;
     }
 
@@ -72,7 +72,6 @@ export default function RotaInputForm({
   
   const handleClearGrid = () => {
     reset({ rotaGrid: {} });
-    // Inform parent to clear results if needed, or parent can derive from empty grid
     const clearedFullRotaInput: RotaInput = {
         scheduleMeta,
         shiftDefinitions,
@@ -85,35 +84,19 @@ export default function RotaInputForm({
   const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   if (!scheduleMeta || !shiftDefinitions) {
-    // This case should ideally be handled by the parent page (e.g., RotaCheckerPage)
-    // by not rendering this form or showing a message.
     return (
-        <Card className="w-full shadow-lg my-8">
-            <CardHeader>
-                <CardTitle className="text-2xl font-headline flex items-center gap-2"><CalendarDays className="text-primary"/>Input Weekly Rota</CardTitle>
-                <CardDescription>Loading schedule configuration or configuration missing...</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <p className="text-muted-foreground text-center py-6">
-                    Schedule configuration or shift types are missing. 
-                    Please <Link href="/profile" className="underline text-primary">update your profile</Link>.
-                </p>
-            </CardContent>
-        </Card>
+        <CardContent>
+            <p className="text-muted-foreground text-center py-6">
+                Schedule configuration or shift types are missing. 
+                Please <Link href="/profile" className="underline text-primary">update your profile</Link>.
+            </p>
+        </CardContent>
     );
   }
 
   return (
-    <Card className="w-full shadow-lg my-8">
-      <CardHeader>
-        <CardTitle className="text-2xl font-headline flex items-center gap-2"><CalendarDays className="text-primary"/>Input/Edit Weekly Rota</CardTitle>
-        <CardDescription>
-            Select the defined shift for each day of your rota cycle. 
-            Schedule configuration (weeks, start date) and shift types are managed in your <Link href="/profile" className="underline text-primary hover:text-primary/80">profile</Link>.
-        </CardDescription>
-      </CardHeader>
       <form onSubmit={handleSubmit(onSubmitGrid)}>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 pt-6"> {/* Added pt-6 for spacing from header */}
           {shiftDefinitions.length === 0 || shiftDefinitions.every(d => !d.dutyCode) ? (
                 <div className="p-4 text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded-md">
                     <p className="flex items-center"><AlertIconLucide size={18} className="mr-2"/>No shift types defined. Please <Link href="/profile" className="font-semibold underline hover:text-amber-700 dark:hover:text-amber-400">add shift definitions in your profile</Link>.</p>
@@ -137,12 +120,18 @@ export default function RotaInputForm({
                                             name={`rotaGrid.week_${weekIndex}_day_${dayIndex}`}
                                             control={control}
                                             render={({ field }) => (
-                                                <Select onValueChange={field.onChange} value={field.value || ""}>
-                                                    <SelectTrigger className="w-full min-w-[100px] sm:min-w-[120px] h-9 text-xs">
+                                                <Select 
+                                                    onValueChange={field.onChange} 
+                                                    value={field.value || ""}
+                                                    disabled={!isEditing} // Disable select if not in edit mode
+                                                >
+                                                    <SelectTrigger 
+                                                        className="w-full min-w-[100px] sm:min-w-[120px] h-9 text-xs"
+                                                        disabled={!isEditing} // Also disable trigger visually
+                                                    >
                                                         <SelectValue placeholder="OFF" />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        {/* Placeholder handles "OFF" display when value is "" */}
                                                         {shiftDefinitions.filter(d => d.dutyCode).map(def => (
                                                             <SelectItem key={def.id} value={def.dutyCode}>
                                                                 {def.dutyCode} - {def.name.substring(0,12)}{def.name.length > 12 ? '...' : ''}
@@ -162,31 +151,33 @@ export default function RotaInputForm({
           )}
           {formErrors.rotaGrid && <p className="text-sm text-destructive mt-1">{typeof formErrors.rotaGrid.message === 'string' ? formErrors.rotaGrid.message : 'Error in rota grid.'}</p>}
         </CardContent>
-        <CardFooter className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t">
-            <AlertDialog>
-                <AlertDialogTrigger asChild>
-                    <Button type="button" variant="destructive" disabled={isProcessing}>
-                        <XCircle className="mr-2 h-4 w-4"/> Clear Rota Grid
-                    </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        This will reset all your rota inputs in the grid above. This action cannot be undone for the grid data.
-                    </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleClearGrid} className="bg-destructive hover:bg-destructive/90">Yes, Clear Grid</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-            <Button type="submit" className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isProcessing || shiftDefinitions.length === 0}>
-                <Send className="mr-2 h-4 w-4" /> {isProcessing ? 'Processing...' : 'Calculate & Check Compliance'}
-            </Button>
-        </CardFooter>
+        {isEditing && (
+            <CardFooter className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t">
+                <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button type="button" variant="destructive" disabled={isProcessing || !isEditing}>
+                            <XCircle className="mr-2 h-4 w-4"/> Clear Rota Grid
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will reset all your rota inputs in the grid above. This action cannot be undone for the grid data.
+                        </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleClearGrid} className="bg-destructive hover:bg-destructive/90">Yes, Clear Grid</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+                <Button type="submit" className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isProcessing || shiftDefinitions.length === 0 || !isEditing}>
+                    <Send className="mr-2 h-4 w-4" /> {isProcessing ? 'Processing...' : 'Calculate & Check Compliance'}
+                </Button>
+            </CardFooter>
+        )}
       </form>
-    </Card>
   );
 }
+
