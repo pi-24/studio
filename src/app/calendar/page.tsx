@@ -121,8 +121,14 @@ export default function MyCalendarPage() {
       const scheduleStartDateObj = parse(rota.scheduleMeta.scheduleStartDate, 'yyyy-MM-dd', new Date());
       if (isNaN(scheduleStartDateObj.getTime())) return;
 
-      const overallRotaEndDate = parse(rota.scheduleMeta.endDate, 'yyyy-MM-dd', new Date());
-      if (isNaN(overallRotaEndDate.getTime())) return;
+      // overallRotaEndDateLoopBoundary is the start of the last day of the rota
+      const overallRotaEndDateLoopBoundary = parse(rota.scheduleMeta.endDate, 'yyyy-MM-dd', new Date());
+      if (isNaN(overallRotaEndDateLoopBoundary.getTime())) return;
+
+      // overallRotaEndDateForComparison is the end of the last day of the rota, for inclusive checks
+      const overallRotaEndDateForComparison = new Date(overallRotaEndDateLoopBoundary);
+      overallRotaEndDateForComparison.setHours(23, 59, 59, 999);
+
 
       const rotaPatternTotalWeeks = rota.scheduleMeta.scheduleTotalWeeks;
       
@@ -130,7 +136,7 @@ export default function MyCalendarPage() {
 
       let currentCalendarDate = new Date(scheduleStartDateObj);
 
-      while (currentCalendarDate <= overallRotaEndDate) {
+      while (currentCalendarDate <= overallRotaEndDateLoopBoundary) { // Iterate up to and including the last day
         const timeDiff = currentCalendarDate.getTime() - scheduleStartDateObj.getTime();
         const daysOffsetFromActualRotaStart = Math.round(timeDiff / (1000 * 60 * 60 * 24));
         const effectiveDayInPatternSequence = firstDayOfWorkPatternIndex + daysOffsetFromActualRotaStart;
@@ -161,7 +167,9 @@ export default function MyCalendarPage() {
                 }
               }
               
-              if (shiftStartDateTime <= overallRotaEndDate && shiftStartDateTime >= scheduleStartDateObj) {
+              // Event is included if its start time is on or after the rota's first day,
+              // AND on or before the *end* of the rota's last specified day.
+              if (shiftStartDateTime <= overallRotaEndDateForComparison && shiftStartDateTime >= scheduleStartDateObj) {
                    events.push({
                       id: `${rota.id}-${shiftDef.id}-${shiftStartDateTime.toISOString()}`, 
                       title: shiftDef.name,
