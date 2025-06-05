@@ -150,3 +150,34 @@ body {
   font-size: 0.65rem; /* 10.4px */
   line-height: 0.85rem; /* 13.6px */
 }
+
+/* Custom style for react-day-picker for scheduled days */
+.day-scheduled {
+  font-weight: bold;
+  /* You can add more distinctive styling, e.g., a dot or background */
+  /* Example: position: relative; */
+}
+/* Example dot using ::after pseudo-element */
+/*
+.day-scheduled::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: hsl(var(--accent));
+}
+*/
+
+/* If you want to color the day itself */
+.day-scheduled:not(.rdp-day_selected) > .rdp-button {
+  background-color: hsl(var(--accent) / 0.1);
+  color: hsl(var(--accent));
+}
+.dark .day-scheduled:not(.rdp-day_selected) > .rdp-button {
+  background-color: hsl(var(--accent) / 0.2);
+  color: hsl(var(--accent));
+}

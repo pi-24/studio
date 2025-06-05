@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, Settings, ListChecks, CreditCard, ExternalLink, PlusCircle, Calendar, FolderKanban } from 'lucide-react';
+import { AlertTriangle, Settings, ListChecks, CreditCard, ExternalLink, PlusCircle, CalendarDays, FolderKanban, Info, AlertCircle as AlertErrorIcon } from 'lucide-react'; // Renamed Calendar to CalendarDays
 import type { RotaDocument } from '@/types';
 
 export default function DashboardPage() {
@@ -26,6 +26,7 @@ export default function DashboardPage() {
   }
 
   if (!user) {
+    // AuthContext should handle redirect to login
     return (
       <div className="flex flex-col items-center justify-center text-center py-12">
          <Card className="w-full max-w-md p-8 shadow-lg">
@@ -33,7 +34,7 @@ export default function DashboardPage() {
              <CardTitle className="text-2xl text-primary">Loading...</CardTitle>
            </CardHeader>
           <CardContent>
-            <p>Redirecting to login...</p>
+            <p>Redirecting...</p>
           </CardContent>
          </Card>
       </div>
@@ -41,6 +42,7 @@ export default function DashboardPage() {
   }
   
    if (!user.isProfileComplete) {
+    // AuthContext should handle redirect to /profile/setup
     return (
       <div className="flex flex-col items-center justify-center text-center py-12">
         <Card className="w-full max-w-md p-8 shadow-lg">
@@ -85,8 +87,8 @@ export default function DashboardPage() {
         </CardHeader>
         {!hasRotas && (
              <CardContent>
-                <div className="p-4 mb-2 text-sm text-yellow-700 bg-yellow-100 rounded-lg dark:bg-yellow-200 dark:text-yellow-800" role="alert">
-                    <span className="font-medium">No Rotas Found:</span> You haven't uploaded any rotas yet. Click the "Upload New Rota" button to get started.
+                <div className="p-4 mb-2 text-sm text-yellow-700 bg-yellow-100 rounded-lg dark:bg-yellow-200 dark:text-yellow-800 flex items-center gap-2" role="alert">
+                    <Info size={18}/> <span className="font-medium">No Rotas Found:</span> You haven't uploaded any rotas yet. Click the "Upload New Rota" button to get started.
                 </div>
             </CardContent>
         )}
@@ -124,15 +126,17 @@ export default function DashboardPage() {
          <Card className="hover:shadow-xl transition-shadow">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl text-primary">
-              <Calendar className="h-6 w-6"/> My Calendar
+              <CalendarDays className="h-6 w-6"/> My Calendar {/* Updated Icon */}
             </CardTitle>
             <CardDescription>
-              View your upcoming shifts and schedule in a calendar format. (Coming Soon)
+              View your upcoming shifts and schedule in a calendar format.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button disabled className="w-full">
-              Open Calendar (Coming Soon)
+            <Button asChild className="w-full">
+              <Link href="/calendar">
+                Open Calendar
+              </Link>
             </Button>
           </CardContent>
         </Card>
@@ -147,12 +151,14 @@ export default function DashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button disabled={!hasRotas} asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" title={!hasRotas ? "Upload a rota first" : "Select a rota from 'My Rotas'"}>
-               {hasRotas ?  <Link href={user.rotas && user.rotas.length > 0 ? `/rota-checker?rotaId=${user.rotas[0].id}` : "#"}>Open Rota Checker</Link> : <span>Open Rota Checker</span>}
+             <Button disabled={!hasRotas} asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" title={!hasRotas ? "Upload a rota first" : "View Rota Checker"}>
+               <Link href={hasRotas && user.rotas && user.rotas.length > 0 ? `/rota-checker?rotaId=${user.rotas[0].id}` : "/rota-checker"}>
+                 Open Rota Checker
+               </Link>
             </Button>
              {!hasRotas && (
-                <p className="text-xs text-amber-600 dark:text-amber-500 mt-3">
-                    Please upload a rota first to use the checker.
+                <p className="text-xs text-amber-600 dark:text-amber-500 mt-3 flex items-center gap-1">
+                    <AlertErrorIcon size={14}/> Please upload a rota first to use the checker.
                 </p>
             )}
           </CardContent>
@@ -181,7 +187,7 @@ export default function DashboardPage() {
                     <Settings className="h-5 w-5" /> Manage Your Personal Profile
                 </CardTitle>
                 <CardDescription>
-                    Update your grade, region, tax details, and other personal information. Rota-specific details are managed via "Upload New Rota" or by editing an existing rota.
+                    Update your grade, region, tax details, and other personal information. Rota-specific details (config, shifts, grid) are managed via "Upload New Rota" or by editing an existing rota through the Rota Checker.
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -195,3 +201,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
