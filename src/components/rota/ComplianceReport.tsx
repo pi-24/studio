@@ -4,7 +4,7 @@
 import type { ProcessedRotaResult, ComplianceResultDetail } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { CheckCircle2, AlertTriangle, XCircle, Info, Clock, Coffee, CircleDollarSign, ListChecks, BarChart3, Hourglass, ShieldAlert, BedDouble, Umbrella } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, XCircle, Info, Clock, Coffee, CircleDollarSign, ListChecks, BarChart3, Hourglass, ShieldAlert, BedDouble, Umbrella, CalendarDays } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
