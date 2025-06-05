@@ -6,12 +6,12 @@ import { useForm, useFieldArray, Controller, SubmitHandler } from 'react-hook-fo
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link'; // Added import
+import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { UserCircle, Mail, LogOut, Briefcase, MapPin, Percent, Landmark, ShieldCheck, Settings2, Trash2, PlusCircle, Save, CalendarDays, ExternalLink, Edit } from 'lucide-react'; // Added Edit
+import { UserCircle, Mail, LogOut, Briefcase, MapPin, Percent, Landmark, ShieldCheck, Settings2, Trash2, PlusCircle, Save, CalendarDays, Edit, ExternalLink } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -54,7 +54,7 @@ const profileEditSchema = z.object({
   shiftDefinitions: z.array(shiftDefinitionSchema).min(1, 'At least one shift definition is required')
     .refine(items => new Set(items.map(item => item.dutyCode)).size === items.length, {
       message: 'Duty Codes must be unique',
-      path: ['shiftDefinitions'] 
+      path: ['shiftDefinitions']
     }).optional(),
   rotaGrid: rotaGridSchema.optional(),
 });
@@ -82,6 +82,13 @@ const calculateShiftDurationString = (startTimeStr: string, finishTimeStr: strin
 
 const daysOfWeekGrid = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+const defaultScheduleMetaValues: ScheduleMetadataType = {
+   wtrOptOut: false, scheduleTotalWeeks: 4, scheduleStartDate: new Date().toISOString().split('T')[0], annualLeaveEntitlement: 27, hoursInNormalDay: 8
+};
+const defaultShiftDefinitionsValues: ShiftDefinitionType[] = [
+  { id: crypto.randomUUID(), dutyCode: 'S1', name: 'Standard Day', type: 'normal', startTime: '09:00', finishTime: '17:00', durationStr: '8h 0m' }
+];
+
 export default function ProfilePage() {
   const { user, logout, updateUserProfile, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -89,7 +96,17 @@ export default function ProfilePage() {
 
   const { control, handleSubmit, register, formState: { errors, isSubmitting, isDirty }, reset, watch, setValue } = useForm<ProfileEditFormValues>({
     resolver: zodResolver(profileEditSchema),
-    defaultValues: {},
+    defaultValues: {
+      grade: undefined,
+      region: undefined,
+      taxCode: '',
+      hasStudentLoan: false,
+      hasPostgraduateLoan: false,
+      nhsPensionOptIn: true,
+      scheduleMeta: defaultScheduleMetaValues,
+      shiftDefinitions: defaultShiftDefinitionsValues,
+      rotaGrid: {},
+    },
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -99,20 +116,14 @@ export default function ProfilePage() {
 
   const watchedShiftDefinitions = watch('shiftDefinitions');
 
-  const defaultScheduleMetaValues: ScheduleMetadataType = {
-     wtrOptOut: false, scheduleTotalWeeks: 4, scheduleStartDate: new Date().toISOString().split('T')[0], annualLeaveEntitlement: 27, hoursInNormalDay: 8
-  };
-  const defaultShiftDefinitionsValues: ShiftDefinitionType[] = [
-    { id: crypto.randomUUID(), dutyCode: 'S1', name: 'Standard Day', type: 'normal', startTime: '09:00', finishTime: '17:00', durationStr: '8h 0m' }
-  ];
 
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login');
     } else if (user) {
       reset({
-        grade: user.grade,
-        region: user.region,
+        grade: user.grade || undefined,
+        region: user.region || undefined,
         taxCode: user.taxCode || '',
         hasStudentLoan: user.hasStudentLoan || false,
         hasPostgraduateLoan: user.hasPostgraduateLoan || false,
@@ -122,7 +133,7 @@ export default function ProfilePage() {
         rotaGrid: user.rotaGrid || {},
       });
     }
-  }, [user, authLoading, router, reset]);
+  }, [user, authLoading, router, reset, defaultScheduleMetaValues, defaultShiftDefinitionsValues]);
   
   useEffect(() => {
     if (watchedShiftDefinitions) {
@@ -141,7 +152,7 @@ export default function ProfilePage() {
   const onSubmit: SubmitHandler<ProfileEditFormValues> = (data) => {
     if (user) {
       const profileUpdateData: Partial<UserProfileData> = {
-        ...data, // rotaGrid will be included if it's part of 'data' from the form
+        ...data, 
         isProfileComplete: true,
       };
       updateUserProfile(profileUpdateData);
@@ -373,3 +384,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+    
