@@ -19,19 +19,11 @@ const CustomCalendarDay: React.FC<CustomCalendarDayProps> = ({
   isSelected,
 }) => {
   const isCurrentMonth = date.getMonth() === displayMonth.getMonth();
-  const MAX_EVENTS_VISIBLE = 2;
+  const MAX_EVENTS_VISIBLE = 2; // Keep this, as cells can still scroll if content overflows
 
   const dayEvents = events.filter(event => isSameDay(event.start, date));
   const visibleEvents = dayEvents.slice(0, MAX_EVENTS_VISIBLE);
   const hiddenEventsCount = Math.max(0, dayEvents.length - MAX_EVENTS_VISIBLE);
-
-  // For dynamic height calculation:
-  // Approximate usable content height within a cell (e.g., h-36 is 144px total, minus day number area and padding).
-  const CELL_CONTENT_HEIGHT_FOR_24_HOURS_PX = 120; 
-  const PX_PER_HOUR = CELL_CONTENT_HEIGHT_FOR_24_HOURS_PX / 24; // Approx 5px per hour
-  // Minimum height for an event lozenge, enough for two lines of text-xxs (0.5rem font + 0.65rem line height => ~10.4px per line * 2 lines + padding)
-  const MIN_EVENT_HEIGHT_PX = Math.ceil(0.65 * 16 * 2 + 4); // approx 25px (16 is typical base font size)
-
 
   const handleCellClick = () => {
     onDayClick(date);
@@ -51,8 +43,8 @@ const CustomCalendarDay: React.FC<CustomCalendarDayProps> = ({
       <div className={cn(
         "flex justify-end text-xs font-medium mb-1",
          isToday(date) && !isSelected && "text-accent dark:text-accent-foreground font-bold",
-         isSelected && isToday(date) && "text-primary-foreground font-bold", // Assuming primary has contrasting foreground for selection
-         isSelected && !isToday(date) && (isCurrentMonth ? "text-primary-foreground" : "text-primary/70 dark:text-primary/60"), // Use primary-foreground if selected in current month
+         isSelected && isToday(date) && "text-primary-foreground font-bold",
+         isSelected && !isToday(date) && (isCurrentMonth ? "text-primary-foreground" : "text-primary/70 dark:text-primary/60"),
          !isSelected && !isToday(date) && (isCurrentMonth ? "text-card-foreground dark:text-card-foreground" : "text-muted-foreground/50 dark:text-muted-foreground/40")
       )}>
         {isToday(date) && (
@@ -69,24 +61,16 @@ const CustomCalendarDay: React.FC<CustomCalendarDayProps> = ({
       {isCurrentMonth && (
         <div className="space-y-0.5 flex-grow overflow-y-auto custom-scrollbar-small">
           {visibleEvents.map((event) => {
-            const durationHours = (event.end.getTime() - event.start.getTime()) / (1000 * 60 * 60);
-            
-            let eventHeightStyle = {};
-            const calculatedHeight = Math.max(MIN_EVENT_HEIGHT_PX, durationHours * PX_PER_HOUR);
-            eventHeightStyle = { height: `${calculatedHeight}px` };
-
             return (
               <div
                 key={event.id}
                 className={cn(
-                  "text-xxs p-0.5 rounded-sm text-white dark:text-opacity-90 overflow-hidden flex flex-col",
-                  event.color || 'bg-primary'
+                  "text-xxs p-1 rounded-md text-white overflow-hidden flex flex-col bg-sky-500"
                 )}
-                style={eventHeightStyle}
                 title={`${event.title}\n${format(event.start, 'HH:mm')} - ${format(event.end, 'HH:mm')}${!isSameDay(event.start, event.end) ? " (next day)" : ""}`}
               >
                 <div className="font-medium truncate">{event.title}</div>
-                <div className="text-white/70 dark:text-white/60">
+                <div className="text-white">
                   {format(event.start, 'HH:mm')} - {format(event.end, 'HH:mm')}
                   {!isSameDay(event.start, event.end) && " (next day)"}
                 </div>
