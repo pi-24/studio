@@ -166,7 +166,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
     try {
       localStorage.removeItem('rotaCalcUser');
-    } catch (error)
+    } catch (error) {
       console.error("Failed to remove user from localStorage", error);
     }
     router.push('/login');
