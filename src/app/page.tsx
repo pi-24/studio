@@ -87,13 +87,6 @@ export default function DashboardPage() {
               Manage your rotas, check compliance, and estimate pay.
             </CardDescription>
           </CardHeader>
-          {!hasRotas && (
-              <CardContent>
-                  <div className="p-4 mb-2 text-sm text-yellow-700 bg-yellow-100 rounded-lg dark:bg-yellow-200 dark:text-yellow-800 flex items-center gap-2" role="alert">
-                      <Info size={18}/> <span className="font-medium">No Rotas Found:</span> You haven't uploaded any rotas yet. Click the "Upload New Rota" button in the 'My Rotas' section below to get started.
-                  </div>
-              </CardContent>
-          )}
         </Card>
 
         <Card className="shadow-lg">
@@ -159,9 +152,10 @@ export default function DashboardPage() {
             )}
              {!hasRotas && (
               <CardContent>
-                <p className="text-muted-foreground text-center py-6">
-                  No rotas uploaded yet. Click "Upload New Rota" above to add your first one.
-                </p>
+                <div className="p-4 mb-2 text-sm text-yellow-700 bg-yellow-100 rounded-lg dark:bg-yellow-200 dark:text-yellow-800 flex items-center gap-2" role="alert">
+                  <Info size={18}/> 
+                  <span className="font-medium">You haven't uploaded any rotas yet. Click the button above to get started.</span>
+                </div>
               </CardContent>
             )}
           </Card>
