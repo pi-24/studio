@@ -1,27 +1,27 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
 import RotaInputForm from '@/components/rota/RotaInputForm';
 import ComplianceReport from '@/components/rota/ComplianceReport';
-import type { ProcessedRotaResult } from '@/types';
+import type { ProcessedRotaResult, RotaInput } from '@/types'; // Added RotaInput
 import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, LogIn } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton'; // For loading state
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function HomePage() {
   const [rotaResult, setRotaResult] = useState<ProcessedRotaResult | { error: string; fieldErrors?: any[] } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const { user, loading } = useAuth();
 
-  // Effect to clear results when user logs out or logs in (new session essentially)
   useEffect(() => {
     setRotaResult(null);
   }, [user]);
   
-  const handleProcessRota = (result: ProcessedRotaResult | { error: string; fieldErrors?: any[] }) => {
+  const handleProcessRota = (result: ProcessedRotaResult | { error: string; fieldErrors?: any[] } | null) => { // Allow null to clear results
     setRotaResult(result);
   };
 
@@ -36,11 +36,21 @@ export default function HomePage() {
           <CardContent className="space-y-4">
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-1/4" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-1/4 mt-4" />
           </CardContent>
           <CardFooter>
             <Skeleton className="h-10 w-1/3 ml-auto" />
           </CardFooter>
+        </Card>
+         <Card className="w-full shadow-lg mt-8">
+          <CardHeader>
+            <Skeleton className="h-8 w-1/2 mb-2" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Skeleton className="h-20 w-full" />
+             <Skeleton className="h-20 w-full" />
+          </CardContent>
         </Card>
       </div>
     );
@@ -75,11 +85,10 @@ export default function HomePage() {
              <div className="mt-8 pt-6 border-t">
                 <h3 className="text-lg font-semibold text-primary mb-2">Key Features:</h3>
                 <ul className="list-disc list-inside text-left text-muted-foreground space-y-1">
-                    <li>Intuitive Rota Data Input</li>
+                    <li>Intuitive Rota Data Input with Shift Definitions</li>
                     <li>Automated Worked Hours Calculation</li>
-                    <li>NHS Guideline Compliance Check (AI-Assisted Insights)</li>
-                    <li>Salary Estimation</li>
-                    <li>Clear Visualizations</li>
+                    <li>NHS Guideline Compliance Checks (based on TCS)</li>
+                    <li>Clear, Categorized Violation Reporting</li>
                 </ul>
             </div>
           </CardContent>

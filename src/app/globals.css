@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -57,10 +58,10 @@ body {
   }
 
   .dark {
-    --background: 215 28% 17%;
-    --foreground: 220 13% 95%;
+    --background: 215 28% 17%; /* Dark Blue-Gray */
+    --foreground: 220 13% 95%; /* Light Gray for text */
 
-    --card: 220 20% 10%;
+    --card: 220 20% 10%; /* Darker Card */
     --card-foreground: 220 13% 95%;
 
     --popover: 220 20% 10%;
@@ -69,21 +70,21 @@ body {
     --primary: 174 100% 35%; /* Teal, slightly lighter for dark mode primary */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 15% 25%;
+    --secondary: 220 15% 25%; /* Darker Secondary */
     --secondary-foreground: 220 13% 95%;
 
-    --muted: 220 15% 25%;
-    --muted-foreground: 220 10% 65%;
+    --muted: 220 15% 25%; /* Darker Muted */
+    --muted-foreground: 220 10% 65%; /* Lighter Muted Text */
 
     --accent: 231 48% 55%; /* Deep Blue, slightly lighter for dark mode accent */
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 70% 50%; /* Slightly less saturated red for dark mode */
     --destructive-foreground: 0 0% 98%;
 
-    --border: 220 15% 30%;
-    --input: 220 15% 30%;
-    --ring: 174 100% 35%;
+    --border: 220 15% 30%; /* Darker Border */
+    --input: 220 15% 30%; /* Darker Input */
+    --ring: 174 100% 35%; /* Teal Ring */
     
     /* Chart colors for dark mode */
     --chart-1: 174 100% 35%;
@@ -112,4 +113,40 @@ body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+}
+
+/* Custom scrollbar styles */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  @apply bg-muted/50 rounded-lg;
+  /* For dark theme specifically, if needed: */
+  /* .dark & { @apply bg-slate-700; } */
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-primary/70 rounded-lg;
+   /* For dark theme specifically, if needed: */
+  /* .dark & { @apply bg-sky-600; } */
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  @apply bg-primary;
+   /* For dark theme specifically, if needed: */
+  /* .dark & { @apply bg-sky-500; } */
+}
+
+/* Ensure dark mode scrollbars are styled if necessary */
+.dark .custom-scrollbar::-webkit-scrollbar-track {
+   background-color: hsl(var(--muted)); /* Or a more specific dark muted color like 220 15% 20% */
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--primary)); /* Teal */
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+   background-color: hsl(var(--primary-foreground)); /* Lighter teal for hover or primary-foreground if it contrasts well */
+}
+.text-xxs {
+  font-size: 0.65rem; /* 10.4px */
+  line-height: 0.85rem; /* 13.6px */
 }
