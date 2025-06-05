@@ -59,11 +59,11 @@ const rotaSpecificScheduleMetadataSchema = z.object({
   annualLeaveEntitlement: z.number().min(0, "Min 0 days"),
   hoursInNormalDay: z.number().min(1, "Min 1 hour").max(24, "Max 24 hours"),
 }).refine(data => {
-    if (!data.scheduleStartDate || !data.endDate) return true; // Let individual field validation handle empty/malformed dates
+    if (!data.scheduleStartDate || !data.endDate) return true; 
     try {
         return new Date(data.endDate) >= new Date(data.scheduleStartDate);
     } catch (e) {
-        return true; // Invalid date format will be caught by regex
+        return true; 
     }
 }, {
     message: "End date must be after or the same as start date",
@@ -88,6 +88,7 @@ const uploadRotaSchema = z.object({
 type UploadRotaFormValues = z.infer<typeof uploadRotaSchema>;
 
 const daysOfWeekGrid = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const OFF_VALUE = "_OFF_";
 
 export default function UploadRotaPage() {
   const { user, addRotaDocument, loading: authLoading } = useAuth();
@@ -133,32 +134,6 @@ export default function UploadRotaPage() {
     });
   }, [watchedShiftDefinitions, setValue]);
 
-  useEffect(() => {
-    if (watchedScheduleMeta?.scheduleStartDate && watchedScheduleMeta?.endDate) {
-      try {
-        const start = new Date(watchedScheduleMeta.scheduleStartDate);
-        const end = new Date(watchedScheduleMeta.endDate);
-        if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end >= start) {
-          const diffTime = Math.abs(end.getTime() - start.getTime());
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; 
-          const diffWeeks = Math.ceil(diffDays / 7);
-          if (watchedScheduleMeta.scheduleTotalWeeks !== diffWeeks && diffWeeks > 0) {
-            setValue('scheduleMeta.scheduleTotalWeeks', diffWeeks, { shouldValidate: true });
-          } else if (diffWeeks <= 0 && watchedScheduleMeta.scheduleTotalWeeks !== 1) {
-            setValue('scheduleMeta.scheduleTotalWeeks', 1, { shouldValidate: true });
-          }
-        } else if (end < start && watchedScheduleMeta.scheduleTotalWeeks !== 1) {
-           setValue('scheduleMeta.scheduleTotalWeeks', 1, { shouldValidate: true }); // Default to 1 if end date is before start
-        }
-      } catch (e) {
-        // Handle invalid date strings if necessary, though regex should catch them
-        if (watchedScheduleMeta.scheduleTotalWeeks !== 1) {
-          setValue('scheduleMeta.scheduleTotalWeeks', 1, { shouldValidate: true });
-        }
-      }
-    }
-  }, [watchedScheduleMeta?.scheduleStartDate, watchedScheduleMeta?.endDate, setValue, watchedScheduleMeta?.scheduleTotalWeeks]);
-
 
   const onSubmit: SubmitHandler<UploadRotaFormValues> = (data) => {
     if (!user) {
@@ -170,7 +145,7 @@ export default function UploadRotaPage() {
     const finalRotaGrid: RotaGridInput = {};
     if (data.rotaGrid) {
         for (const key in data.rotaGrid) {
-            finalRotaGrid[key] = data.rotaGrid[key] === "_OFF_" ? "" : data.rotaGrid[key];
+            finalRotaGrid[key] = data.rotaGrid[key] === OFF_VALUE ? "" : data.rotaGrid[key];
         }
     }
 
@@ -195,7 +170,7 @@ export default function UploadRotaPage() {
   const validateStep = async (step: number) => {
     let fieldsToValidate: (keyof UploadRotaFormValues | `scheduleMeta.${keyof RotaSpecificScheduleMetadata}` | `shiftDefinitions.${number}.${keyof ShiftDefinitionType}` | 'shiftDefinitions' )[] = [];
     if (step === 1) fieldsToValidate = ['scheduleMeta'];
-    if (step === 2) fieldsToValidate = ['shiftDefinitions']; // Validates the whole array and its elements
+    if (step === 2) fieldsToValidate = ['shiftDefinitions']; 
     if (step === 3) fieldsToValidate = ['rotaGrid' as any]; 
     
     const isValid = await trigger(fieldsToValidate as any); 
@@ -267,8 +242,8 @@ export default function UploadRotaPage() {
                     </div>
                   </div>
                   <div>
-                    <Label htmlFor="scheduleMeta.scheduleTotalWeeks" className="text-muted-foreground">Number of Weeks in Rota Cycle (auto-calculated)</Label>
-                    <Input type="number" id="scheduleMeta.scheduleTotalWeeks" {...register('scheduleMeta.scheduleTotalWeeks', { valueAsNumber: true })} min="1" max="52" readOnly className="bg-muted/50"/>
+                    <Label htmlFor="scheduleMeta.scheduleTotalWeeks">Number of Weeks in Rota Cycle</Label>
+                    <Input type="number" id="scheduleMeta.scheduleTotalWeeks" {...register('scheduleMeta.scheduleTotalWeeks', { valueAsNumber: true })} min="1" max="52" />
                     {errors.scheduleMeta?.scheduleTotalWeeks && <p className="text-sm text-destructive mt-1">{errors.scheduleMeta.scheduleTotalWeeks.message}</p>}
                   </div>
                   <div>
@@ -366,15 +341,14 @@ export default function UploadRotaPage() {
                                                     <Controller
                                                         name={`rotaGrid.week_${weekIndex}_day_${dayIndex}`}
                                                         control={control}
-                                                        defaultValue="" // Represents OFF
+                                                        defaultValue="" 
                                                         render={({ field }) => (
                                                             <Select onValueChange={field.onChange} value={field.value || ""}>
                                                                 <SelectTrigger className="w-full min-w-[100px] sm:min-w-[120px] h-9 text-xs">
                                                                     <SelectValue placeholder="OFF" />
                                                                 </SelectTrigger>
                                                                 <SelectContent>
-                                                                    {/* Item for OFF, using a special value */}
-                                                                    <SelectItem value="_OFF_">OFF</SelectItem>
+                                                                    <SelectItem value={OFF_VALUE}>OFF</SelectItem>
                                                                     {watchedShiftDefinitions
                                                                         .filter(def => def && typeof def.dutyCode === 'string' && def.dutyCode.trim() !== '')
                                                                         .map(def => (
@@ -410,6 +384,4 @@ export default function UploadRotaPage() {
     </div>
   );
 }
-
-
     
