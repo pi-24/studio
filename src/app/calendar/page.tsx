@@ -8,7 +8,7 @@ import { DayPicker } from 'react-day-picker';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { AlertCircle, CalendarDays, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { AlertCircle, CalendarDays, ChevronLeft, ChevronRight, Loader2, Download } from 'lucide-react';
 import type { RotaDocument } from '@/types';
 import { parse, format, isSameDay, addMonths, subMonths, startOfMonth } from 'date-fns';
 import { enGB } from 'date-fns/locale'; // Import en-GB locale
@@ -43,6 +43,56 @@ const getPatternDayIndex = (date: Date): number => {
   const day = date.getDay(); // Sunday is 0, Monday is 1, etc.
   return day === 0 ? 6 : day - 1; // Adjust to Mon=0, ..., Sun=6
 };
+
+// Helper to format date to ICS UTC format YYYYMMDDTHHMMSSZ
+const formatDateToICS = (date: Date): string => {
+  const pad = (num: number) => (num < 10 ? '0' : '') + num;
+  return (
+    date.getUTCFullYear() +
+    pad(date.getUTCMonth() + 1) +
+    pad(date.getUTCDate()) +
+    'T' +
+    pad(date.getUTCHours()) +
+    pad(date.getUTCMinutes()) +
+    pad(date.getUTCSeconds()) +
+    'Z'
+  );
+};
+
+// Generates .ics file content
+const generateICSFileContent = (events: DisplayEvent[]): string => {
+  let icsString = '';
+  icsString += 'BEGIN:VCALENDAR\r\n';
+  icsString += 'VERSION:2.0\r\n';
+  icsString += 'PRODID:-//RotaCalc//YourApp//EN\r\n';
+  icsString += 'CALSCALE:GREGORIAN\r\n';
+
+  events.forEach(event => {
+    const descriptionParts = [
+      `Rota: ${event.rotaName}`,
+      `Site: ${event.site}`,
+      `Duty Code: ${event.dutyCode}`,
+    ];
+    if (event.type === 'on-call') {
+      descriptionParts.push('(On-Call)');
+    }
+    const description = descriptionParts.join('\\n'); // \n for newlines in ICS description
+
+    icsString += 'BEGIN:VEVENT\r\n';
+    icsString += `UID:${event.id}@rotacalc.app\r\n`; // Make UID more robust
+    icsString += `DTSTAMP:${formatDateToICS(new Date())}\r\n`;
+    icsString += `DTSTART:${formatDateToICS(event.start)}\r\n`;
+    icsString += `DTEND:${formatDateToICS(event.end)}\r\n`;
+    icsString += `SUMMARY:${event.title}\r\n`;
+    icsString += `DESCRIPTION:${description}\r\n`;
+    icsString += `LOCATION:${event.site}\r\n`;
+    icsString += 'END:VEVENT\r\n';
+  });
+
+  icsString += 'END:VCALENDAR\r\n';
+  return icsString;
+};
+
 
 export default function MyCalendarPage() {
   const { user, loading: authLoading } = useAuth();
@@ -159,6 +209,22 @@ export default function MyCalendarPage() {
     return eventsByDay.get(dayKey) || [];
   }, [eventsByDay, selectedDate]);
 
+  const handleExportToICS = () => {
+    if (allEvents.length === 0) {
+      alert("No events to export.");
+      return;
+    }
+    const icsContent = generateICSFileContent(allEvents);
+    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", "rotacalc_shifts.ics");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   if (authLoading) {
     return (
@@ -183,9 +249,9 @@ export default function MyCalendarPage() {
     <div className="space-y-8">
       <Card className="shadow-lg bg-card text-card-foreground">
         <CardHeader className="border-b border-border">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">{format(currentMonth, 'MMMM yyyy')}</h2>
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+            <h2 className="text-xl font-semibold">{format(currentMonth, 'MMMM yyyy', { locale: enGB })}</h2>
+            <div className="flex items-center gap-1 sm:gap-2">
               <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -194,6 +260,9 @@ export default function MyCalendarPage() {
               </Button>
               <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
                 <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" onClick={handleExportToICS} disabled={allEvents.length === 0}>
+                <Download className="mr-2 h-4 w-4" /> Export
               </Button>
             </div>
           </div>
@@ -292,3 +361,6 @@ export default function MyCalendarPage() {
     </div>
   );
 }
+
+
+    
