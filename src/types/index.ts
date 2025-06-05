@@ -1,7 +1,14 @@
 
-export interface User {
-  id: string;
-  email: string;
+
+export type UserGrade = 'F1' | 'F2' | 'CT1' | 'CT2' | 'CT3+' | 'ST1' | 'ST2' | 'ST3+' | 'SpecialtyDoctor' | 'Consultant' | 'Other';
+export type UKRegion = 'London' | 'SouthEast' | 'SouthWest' | 'EastOfEngland' | 'Midlands' | 'NorthEastAndYorkshire' | 'NorthWest' | 'Scotland' | 'Wales' | 'NorthernIreland' | 'Other';
+
+export interface ScheduleMetadata {
+  wtrOptOut: boolean;
+  scheduleTotalWeeks: number;
+  scheduleStartDate: string; // YYYY-MM-DD
+  annualLeaveEntitlement: number; // days per year
+  hoursInNormalDay: number; // for leave calculation
 }
 
 export interface ShiftDefinition {
@@ -14,12 +21,21 @@ export interface ShiftDefinition {
   durationStr: string; // e.g., "8h 0m"
 }
 
-export interface ScheduleMetadata {
-  wtrOptOut: boolean;
-  scheduleTotalWeeks: number;
-  scheduleStartDate: string; // YYYY-MM-DD
-  annualLeaveEntitlement: number; // days per year
-  hoursInNormalDay: number; // for leave calculation
+export interface UserProfileData {
+  grade?: UserGrade;
+  region?: UKRegion;
+  taxCode?: string;
+  hasStudentLoan?: boolean;
+  hasPostgraduateLoan?: boolean;
+  nhsPensionOptIn?: boolean;
+  isProfileComplete: boolean;
+  scheduleMeta?: ScheduleMetadata;
+  shiftDefinitions?: ShiftDefinition[];
+}
+
+export interface User extends UserProfileData {
+  id: string;
+  email: string;
 }
 
 // Represents the user's input for the rota grid
@@ -41,7 +57,6 @@ export interface ProcessedShift {
   end: Date;
   type: 'normal' | 'on-call'; // From shift definition
   resource?: { dutyCode: string };
-  // Potentially other properties derived from ShiftDefinition
 }
 
 export interface ComplianceResultDetail {
@@ -58,20 +73,18 @@ export interface ComplianceResultDetail {
 }
 
 export interface ProcessedRotaResult {
-  totalHours: number; // This might be less relevant with detailed checks, or could be overall scheduled hours
-  totalBreakHours: number; // This was a mock, actual break handling needs to be clarified for compliance
-  payableHours: number; // Mock
-  complianceSummary: string; // e.g., "Compliant", "Review Needed"
-  complianceMessages: ComplianceResultDetail[]; // Changed from ComplianceMessage
-  estimatedSalary: number; // Mock
-  // Potentially add processedShifts if needed by report
-  // processedShifts?: ProcessedShift[]; 
+  totalHours: number;
+  totalBreakHours: number;
+  payableHours: number;
+  complianceSummary: string;
+  complianceMessages: ComplianceResultDetail[];
+  estimatedSalary: number;
 }
 
 // For raw shift data (if needed for any direct input, though new form focuses on definitions)
 export interface ShiftData {
   id: string;
-  date: string; 
+  date: string;
   startTime: string;
   endTime: string;
   breakMinutes: number;
