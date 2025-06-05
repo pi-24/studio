@@ -172,8 +172,8 @@ body {
 
 
 .text-xxs {
-  font-size: 0.6rem; /* Previous: 0.65rem (10.4px) */
-  line-height: 0.75rem; /* Previous: 0.85rem (13.6px) */
+  font-size: 0.5rem; /* Adjusted from 0.6rem */
+  line-height: 0.65rem; /* Adjusted from 0.75rem */
 }
 
 /* Calendar styles */
