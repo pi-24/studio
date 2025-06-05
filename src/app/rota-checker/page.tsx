@@ -80,7 +80,7 @@ export default function RotaCheckerPage() {
     }
   });
 
-  const performRotaProcessing = useCallback(async (currentRotaDoc: RotaDocument) => {
+  const performRotaProcessingAndUpdateState = useCallback(async (currentRotaDoc: RotaDocument) => {
     setIsProcessing(true);
     const processingInput: RotaProcessingInput = {
         scheduleMeta: currentRotaDoc.scheduleMeta,
@@ -90,12 +90,24 @@ export default function RotaCheckerPage() {
     const result = await processRota(processingInput);
     setRotaResult(result);
     setIsProcessing(false);
+
     if ('error' in result) {
         toast({ title: "Processing Error", description: result.error, variant: "destructive" });
+        // Even if processing fails, ensure the display and context have the latest structural data
+        updateRotaDocument(currentRotaDoc); 
+        setRotaToDisplay(currentRotaDoc);
     } else {
         toast({ title: "Rota Processed", description: "Compliance checks updated." });
+        // Update the rota document in AuthContext with the new compliance summary
+        const updatedDocWithStatus: RotaDocument = {
+            ...currentRotaDoc,
+            complianceSummary: result.complianceSummary,
+        };
+        updateRotaDocument(updatedDocWithStatus);
+        setRotaToDisplay(updatedDocWithStatus); // Ensure local state also has the summary
     }
-  }, [toast]);
+  }, [toast, updateRotaDocument]);
+
 
   useEffect(() => {
     if (authLoading || !user) return;
@@ -113,9 +125,11 @@ export default function RotaCheckerPage() {
 
     const foundRota = user.rotas?.find(r => r.id === rotaId);
     if (foundRota) {
+        // Check if rota to display is different or if key data has changed
       if (rotaToDisplay?.id !== foundRota.id || 
           JSON.stringify(rotaToDisplay?.scheduleMeta) !== JSON.stringify(foundRota.scheduleMeta) ||
-          JSON.stringify(rotaToDisplay?.rotaGrid) !== JSON.stringify(foundRota.rotaGrid)
+          JSON.stringify(rotaToDisplay?.rotaGrid) !== JSON.stringify(foundRota.rotaGrid) ||
+          rotaToDisplay?.complianceSummary !== foundRota.complianceSummary // Check for summary change too
          ) {
         setRotaToDisplay(foundRota);
         resetDetailsForm({
@@ -129,14 +143,23 @@ export default function RotaCheckerPage() {
             annualLeaveEntitlement: foundRota.scheduleMeta.annualLeaveEntitlement,
             hoursInNormalDay: foundRota.scheduleMeta.hoursInNormalDay,
         });
-        performRotaProcessing(foundRota);
+        // If rota has no compliance summary or if significant parts changed, reprocess
+        if (!foundRota.complianceSummary || rotaToDisplay?.id !== foundRota.id) {
+             performRotaProcessingAndUpdateState(foundRota);
+        } else {
+            // If it has a summary and it's the same rota, just display stored result for speed
+            // (assuming complianceMessages can be reconstructed or aren't needed if not reprocessing)
+            // For now, we'll re-process to ensure compliance messages are always fresh for the displayed rota,
+            // but this could be optimized if `complianceMessages` were also stored.
+             performRotaProcessingAndUpdateState(foundRota);
+        }
       }
     } else {
       setRotaToDisplay(null);
       setRotaResult({error: `Rota with ID "${rotaId}" not found.`});
       toast({ title: "Error", description: `Rota with ID "${rotaId}" not found.`, variant: "destructive"});
     }
-  }, [user, authLoading, searchParams, router, toast, performRotaProcessing, rotaToDisplay, resetDetailsForm]);
+  }, [user, authLoading, searchParams, router, toast, performRotaProcessingAndUpdateState, rotaToDisplay, resetDetailsForm]);
 
 
   const handleRotaGridUpdateAndProcess = useCallback(async (submittedRotaGrid: RotaGridInput) => {
@@ -145,20 +168,12 @@ export default function RotaCheckerPage() {
       return;
     }
     
-    const currentGridString = JSON.stringify(rotaToDisplay.rotaGrid);
-    const newGridString = JSON.stringify(submittedRotaGrid);
-
-    let updatedRotaDoc = { ...rotaToDisplay, rotaGrid: submittedRotaGrid };
-
-    if (currentGridString !== newGridString) {
-      updateRotaDocument(updatedRotaDoc); // Save if grid changed
-      setRotaToDisplay(updatedRotaDoc); // Update local state
-    }
+    const updatedRotaDoc = { ...rotaToDisplay, rotaGrid: submittedRotaGrid };
+    // No need to call updateRotaDocument here, performRotaProcessingAndUpdateState will handle it
+    await performRotaProcessingAndUpdateState(updatedRotaDoc);
+    setIsEditingRotaGrid(false); 
     
-    await performRotaProcessing(updatedRotaDoc);
-    setIsEditingRotaGrid(false); // Switch back to view mode for grid
-    
-  }, [user, rotaToDisplay, toast, updateRotaDocument, performRotaProcessing]);
+  }, [user, rotaToDisplay, performRotaProcessingAndUpdateState]);
 
   const onSaveRotaDetails: SubmitHandler<RotaDetailsFormValues> = async (data) => {
     if (!user || !rotaToDisplay) {
@@ -179,13 +194,14 @@ export default function RotaCheckerPage() {
         ...rotaToDisplay,
         name: data.name,
         scheduleMeta: updatedScheduleMeta,
+        // Preserve existing compliance summary or let it be re-calculated
+        complianceSummary: rotaToDisplay.complianceSummary 
     };
     
-    updateRotaDocument(updatedRotaDoc);
-    setRotaToDisplay(updatedRotaDoc); // Update local state
-    await performRotaProcessing(updatedRotaDoc);
+    // performRotaProcessingAndUpdateState will call updateRotaDocument with the final status
+    await performRotaProcessingAndUpdateState(updatedRotaDoc);
     setIsEditingRotaDetails(false);
-    toast({title: "Rota Details Saved", description: "The rota's core information has been updated."});
+    // Toast for saving details is handled by performRotaProcessing success/error
   };
 
 
@@ -230,13 +246,13 @@ export default function RotaCheckerPage() {
   
   const handleToggleEditGrid = () => {
     setIsEditingRotaGrid(!isEditingRotaGrid);
-    if (isEditingRotaDetails) setIsEditingRotaDetails(false); // Ensure only one edit mode active
+    if (isEditingRotaDetails) setIsEditingRotaDetails(false); 
   };
 
   const handleToggleEditDetails = () => {
     setIsEditingRotaDetails(!isEditingRotaDetails);
-    if (isEditingRotaGrid) setIsEditingRotaGrid(false); // Ensure only one edit mode active
-    if (!isEditingRotaDetails && rotaToDisplay) { // When toggling to view, reset form to current rota values
+    if (isEditingRotaGrid) setIsEditingRotaGrid(false); 
+    if (!isEditingRotaDetails && rotaToDisplay) { 
         resetDetailsForm({
             name: rotaToDisplay.name,
             site: rotaToDisplay.scheduleMeta.site,
@@ -331,9 +347,10 @@ export default function RotaCheckerPage() {
                     </div>
                 </CardContent>
                 <CardFooter className="flex justify-end gap-2 pt-4 border-t">
-                    <Button type="button" variant="ghost" onClick={handleToggleEditDetails} disabled={detailsIsSubmitting}>Cancel</Button>
-                    <Button type="submit" className="bg-accent hover:bg-accent/90 text-accent-foreground" disabled={detailsIsSubmitting}>
-                        <Save className="mr-2 h-4 w-4" /> {detailsIsSubmitting ? 'Saving...' : 'Save Rota Details'}
+                    <Button type="button" variant="ghost" onClick={handleToggleEditDetails} disabled={detailsIsSubmitting || isProcessing}>Cancel</Button>
+                    <Button type="submit" className="bg-accent hover:bg-accent/90 text-accent-foreground" disabled={detailsIsSubmitting || isProcessing}>
+                        {detailsIsSubmitting || isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        {detailsIsSubmitting || isProcessing ? 'Saving & Checking...' : 'Save Details & Re-check'}
                     </Button>
                 </CardFooter>
             </form>
@@ -353,11 +370,11 @@ export default function RotaCheckerPage() {
                         {isEditingRotaGrid 
                             ? "Modify your rota grid below. Click 'Save Rota and Check Compliance' to update."
                             : "View your current rota grid. Click 'Edit Rota Grid' to make changes."}
-                         Shift types are defined when <Link href="/upload-rota" className="underline text-primary hover:text-primary/80">uploading a new rota</Link> (editing shift types for existing rotas coming soon).
+                         Shift types are defined when <Link href="/upload-rota" className="underline text-primary hover:text-primary/80">uploading a new rota</Link>.
                     </CardDescription>
                 </div>
                 {!isEditingRotaGrid && (
-                    <Button onClick={handleToggleEditGrid} variant="outline" className="w-full sm:w-auto">
+                    <Button onClick={handleToggleEditGrid} variant="outline" className="w-full sm:w-auto" disabled={isProcessing || detailsIsSubmitting}>
                         <Edit className="mr-2 h-4 w-4" /> 
                         Edit Rota Grid
                     </Button>
@@ -365,7 +382,7 @@ export default function RotaCheckerPage() {
             </div>
         </CardHeader>
         <RotaInputForm
-          key={`${rotaToDisplay.id}-${rotaToDisplay.scheduleMeta.scheduleTotalWeeks}-${rotaToDisplay.scheduleMeta.scheduleStartDate}`} // Force re-render if key parts change
+          key={`${rotaToDisplay.id}-${rotaToDisplay.scheduleMeta.scheduleTotalWeeks}-${rotaToDisplay.scheduleMeta.scheduleStartDate}`} 
           scheduleMetaConfig={{
             scheduleTotalWeeks: rotaToDisplay.scheduleMeta.scheduleTotalWeeks,
             scheduleStartDate: rotaToDisplay.scheduleMeta.scheduleStartDate,
@@ -373,7 +390,7 @@ export default function RotaCheckerPage() {
           shiftDefinitions={rotaToDisplay.shiftDefinitions}
           initialRotaGrid={rotaToDisplay.rotaGrid || {}}
           onProcessRota={handleRotaGridUpdateAndProcess} 
-          isProcessing={isProcessing || detailsIsSubmitting} // Disable grid form if details are being submitted
+          isProcessing={isProcessing || detailsIsSubmitting} 
           isEditing={isEditingRotaGrid}
         />
       </Card>

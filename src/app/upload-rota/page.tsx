@@ -14,10 +14,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
-import { RotaDocument, ShiftDefinition as ShiftDefinitionType, RotaSpecificScheduleMetadata, RotaGridInput } from '@/types';
-import { PlusCircle, Trash2, Save, ArrowRight, Settings2, Briefcase, CalendarDays, FileText } from 'lucide-react';
+import { RotaDocument, ShiftDefinition as ShiftDefinitionType, RotaSpecificScheduleMetadata, RotaGridInput, RotaProcessingInput } from '@/types';
+import { PlusCircle, Trash2, Save, ArrowRight, Settings2, Briefcase, CalendarDays, FileText, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import Link from 'next/link';
+import { processRota } from '@/app/actions';
 
 const calculateShiftDurationString = (startTimeStr: string, finishTimeStr: string): string => {
     if (!startTimeStr || !finishTimeStr) return "0h 0m";
@@ -95,8 +96,9 @@ export default function UploadRotaPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
+  const [isSavingAndProcessing, setIsSavingAndProcessing] = useState(false);
 
-  const { control, handleSubmit, register, formState: { errors, isSubmitting }, watch, setValue, trigger } = useForm<UploadRotaFormValues>({
+  const { control, handleSubmit, register, formState: { errors }, watch, setValue, trigger } = useForm<UploadRotaFormValues>({
     resolver: zodResolver(uploadRotaSchema),
     defaultValues: {
       scheduleMeta: {
@@ -135,12 +137,13 @@ export default function UploadRotaPage() {
   }, [watchedShiftDefinitions, setValue]);
 
 
-  const onSubmit: SubmitHandler<UploadRotaFormValues> = (data) => {
+  const onSubmit: SubmitHandler<UploadRotaFormValues> = async (data) => {
     if (!user) {
         toast({ title: "Error", description: "User not found. Please log in.", variant: "destructive"});
         router.push('/login');
         return;
     }
+    setIsSavingAndProcessing(true);
     
     const finalRotaGrid: RotaGridInput = {};
     if (data.rotaGrid) {
@@ -149,7 +152,7 @@ export default function UploadRotaPage() {
         }
     }
 
-    const newRotaDocument: RotaDocument = {
+    const rotaDocumentBase: Omit<RotaDocument, 'complianceSummary'> = {
       id: crypto.randomUUID(),
       name: data.scheduleMeta.name,
       scheduleMeta: data.scheduleMeta,
@@ -157,9 +160,42 @@ export default function UploadRotaPage() {
       rotaGrid: finalRotaGrid, 
       createdAt: new Date().toISOString(),
     };
-    addRotaDocument(newRotaDocument);
-    toast({ title: "Rota Uploaded!", description: `${data.scheduleMeta.name} has been saved.` });
-    router.push('/'); 
+
+    const processingInput: RotaProcessingInput = {
+        scheduleMeta: rotaDocumentBase.scheduleMeta,
+        shiftDefinitions: rotaDocumentBase.shiftDefinitions,
+        rotaGrid: rotaDocumentBase.rotaGrid
+    };
+
+    try {
+        const result = await processRota(processingInput);
+        let complianceSummary: string | undefined = undefined;
+
+        if ('error' in result) {
+            toast({ title: "Rota Saved (with Processing Issue)", description: `${data.scheduleMeta.name} saved, but compliance check failed: ${result.error}`, variant: "default" });
+        } else {
+            complianceSummary = result.complianceSummary;
+            toast({ title: "Rota Uploaded & Checked!", description: `${data.scheduleMeta.name} has been saved. Compliance: ${complianceSummary}` });
+        }
+
+        const newRotaDocument: RotaDocument = {
+            ...rotaDocumentBase,
+            complianceSummary: complianceSummary,
+        };
+
+        addRotaDocument(newRotaDocument);
+        router.push('/'); 
+
+    } catch (error) {
+        console.error("Error during rota processing or saving:", error);
+        toast({ title: "Error", description: "Failed to save or process the rota. Please try again.", variant: "destructive"});
+        // Save rota even if processing fails, without compliance summary
+        const newRotaDocument: RotaDocument = { ...rotaDocumentBase, complianceSummary: undefined };
+        addRotaDocument(newRotaDocument);
+        router.push('/'); // Or redirect to a page indicating partial success
+    } finally {
+        setIsSavingAndProcessing(false);
+    }
   };
   
   const addShiftDefinition = () => {
@@ -374,10 +410,15 @@ export default function UploadRotaPage() {
             </Accordion>
           </CardContent>
           <CardFooter className="flex justify-between pt-6 border-t">
-            <Button type="button" variant="outline" onClick={() => router.push('/')}>Cancel</Button>
-            {currentStep > 1 && <Button type="button" variant="outline" onClick={prevStep}>Previous</Button>}
-            {currentStep < 3 && <Button type="button" onClick={nextStep} className="ml-auto">Next <ArrowRight className="ml-2 h-4 w-4"/></Button>}
-            {currentStep === 3 && <Button type="submit" disabled={isSubmitting} className="ml-auto bg-accent hover:bg-accent/90 text-accent-foreground"><Save className="mr-2 h-4 w-4" /> Save Rota</Button>}
+            <Button type="button" variant="outline" onClick={() => router.push('/')} disabled={isSavingAndProcessing}>Cancel</Button>
+            {currentStep > 1 && <Button type="button" variant="outline" onClick={prevStep} disabled={isSavingAndProcessing}>Previous</Button>}
+            {currentStep < 3 && <Button type="button" onClick={nextStep} className="ml-auto" disabled={isSavingAndProcessing}>Next <ArrowRight className="ml-2 h-4 w-4"/></Button>}
+            {currentStep === 3 && 
+                <Button type="submit" disabled={isSavingAndProcessing} className="ml-auto bg-accent hover:bg-accent/90 text-accent-foreground">
+                    {isSavingAndProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    {isSavingAndProcessing ? 'Saving & Checking...' : 'Save Rota & Check Compliance'}
+                </Button>
+            }
           </CardFooter>
         </form>
       </Card>

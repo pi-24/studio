@@ -40,6 +40,7 @@ export interface RotaDocument {
   shiftDefinitions: ShiftDefinition[];
   rotaGrid: RotaGridInput;
   createdAt: string; // ISO date string
+  complianceSummary?: string; // e.g., "Compliant", "Review Needed"
 }
 
 export interface UserProfileData {
@@ -96,3 +97,4 @@ export interface ProcessedRotaResult {
   complianceMessages: ComplianceResultDetail[];
   estimatedSalary: number;
 }
+
