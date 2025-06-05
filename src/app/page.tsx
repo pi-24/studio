@@ -1,13 +1,13 @@
 
 "use client";
 
-import { useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, Settings, ListChecks, CreditCard, ExternalLink } from 'lucide-react';
+import { AlertTriangle, Settings, ListChecks, CreditCard, ExternalLink, PlusCircle, Calendar, FolderKanban } from 'lucide-react';
+import type { RotaDocument } from '@/types';
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
@@ -25,10 +25,7 @@ export default function DashboardPage() {
     );
   }
 
-  // AuthContext handles redirection if user is null or profile is incomplete
   if (!user) {
-    // This part should ideally not be reached if AuthContext is working correctly,
-    // but as a fallback:
     return (
       <div className="flex flex-col items-center justify-center text-center py-12">
          <Card className="w-full max-w-md p-8 shadow-lg">
@@ -44,7 +41,6 @@ export default function DashboardPage() {
   }
   
    if (!user.isProfileComplete) {
-     // Also should be handled by AuthContext, but good to have a fallback UI
     return (
       <div className="flex flex-col items-center justify-center text-center py-12">
         <Card className="w-full max-w-md p-8 shadow-lg">
@@ -67,46 +63,96 @@ export default function DashboardPage() {
     );
   }
   
-  const isRotaGridEmpty = !user.rotaGrid || Object.keys(user.rotaGrid).length === 0;
+  const hasRotas = user.rotas && user.rotas.length > 0;
 
   return (
     <div className="space-y-10">
       <Card className="shadow-lg border-primary/20">
         <CardHeader>
-          <CardTitle className="text-3xl font-headline text-primary">Welcome to RotaCalc, {user.email}!</CardTitle>
-          <CardDescription className="text-md">
-            This is your dashboard. Access tools and manage your rota information from here.
-          </CardDescription>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <CardTitle className="text-3xl font-headline text-primary">Welcome to RotaCalc, {user.email?.split('@')[0]}!</CardTitle>
+              <CardDescription className="text-md mt-1">
+                Manage your rotas, check compliance, and estimate pay.
+              </CardDescription>
+            </div>
+            <Button asChild size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground w-full sm:w-auto">
+              <Link href="/upload-rota">
+                <PlusCircle className="mr-2 h-5 w-5" /> Upload New Rota
+              </Link>
+            </Button>
+          </div>
         </CardHeader>
-        {isRotaGridEmpty && (
+        {!hasRotas && (
              <CardContent>
                 <div className="p-4 mb-2 text-sm text-yellow-700 bg-yellow-100 rounded-lg dark:bg-yellow-200 dark:text-yellow-800" role="alert">
-                    <span className="font-medium">Rota Not Entered:</span> You haven't entered your rota schedule yet. 
-                    You can do this via the <Link href="/profile/setup" className="font-semibold underline hover:text-yellow-800">profile setup</Link> (if completing for the first time) or by visiting the Rota Compliance Checker tool.
+                    <span className="font-medium">No Rotas Found:</span> You haven't uploaded any rotas yet. Click the "Upload New Rota" button to get started.
                 </div>
             </CardContent>
         )}
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {hasRotas && (
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold text-primary flex items-center gap-2">
+              <FolderKanban className="h-5 w-5" /> My Rotas
+            </CardTitle>
+            <CardDescription>
+              View and manage your uploaded rotas. Click a rota to view its compliance report.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {user.rotas?.map((rota: RotaDocument) => (
+              <Link key={rota.id} href={`/rota-checker?rotaId=${rota.id}`} passHref>
+                <div className="block p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
+                  <h3 className="font-medium text-lg text-accent">{rota.name || `Rota starting ${rota.scheduleMeta.scheduleStartDate}`}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Site: {rota.scheduleMeta.site || 'N/A'} | Specialty: {rota.scheduleMeta.specialty || 'N/A'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Dates: {new Date(rota.scheduleMeta.scheduleStartDate).toLocaleDateString()} - {new Date(rota.scheduleMeta.endDate).toLocaleDateString()}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+         <Card className="hover:shadow-xl transition-shadow">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-xl text-primary">
+              <Calendar className="h-6 w-6"/> My Calendar
+            </CardTitle>
+            <CardDescription>
+              View your upcoming shifts and schedule in a calendar format. (Coming Soon)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button disabled className="w-full">
+              Open Calendar (Coming Soon)
+            </Button>
+          </CardContent>
+        </Card>
+
         <Card className="hover:shadow-xl transition-shadow">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl text-accent">
               <ListChecks className="h-6 w-6"/> Rota Compliance Checker
             </CardTitle>
             <CardDescription>
-              Analyze your rota against NHS compliance rules. View and edit your current rota schedule.
+              Select a rota from "My Rotas" to analyze its compliance against NHS rules.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-              <Link href="/rota-checker">
-                Open Rota Checker <ExternalLink className="ml-2 h-4 w-4" />
-              </Link>
+            <Button disabled={!hasRotas} asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" title={!hasRotas ? "Upload a rota first" : "Select a rota from 'My Rotas'"}>
+               {hasRotas ?  <Link href={user.rotas && user.rotas.length > 0 ? `/rota-checker?rotaId=${user.rotas[0].id}` : "#"}>Open Rota Checker</Link> : <span>Open Rota Checker</span>}
             </Button>
-             {isRotaGridEmpty && (
+             {!hasRotas && (
                 <p className="text-xs text-amber-600 dark:text-amber-500 mt-3">
-                    Your rota grid is currently empty. Please input your rota in the checker.
+                    Please upload a rota first to use the checker.
                 </p>
             )}
           </CardContent>
@@ -132,10 +178,10 @@ export default function DashboardPage() {
        <Card className="mt-10 shadow-lg">
             <CardHeader>
                 <CardTitle className="text-xl font-semibold text-primary flex items-center gap-2">
-                    <Settings className="h-5 w-5" /> Manage Your Profile
+                    <Settings className="h-5 w-5" /> Manage Your Personal Profile
                 </CardTitle>
                 <CardDescription>
-                    Update your personal details, rota configuration, shift types, and saved rota schedule.
+                    Update your grade, region, tax details, and other personal information. Rota-specific details are managed via "Upload New Rota" or by editing an existing rota.
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -146,7 +192,6 @@ export default function DashboardPage() {
                 </Button>
             </CardContent>
         </Card>
-
     </div>
   );
 }

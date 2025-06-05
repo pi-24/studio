@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { User, UserProfileData, RotaGridInput, ScheduleMetadata, ShiftDefinition } from '@/types';
+import type { User, UserProfileData, RotaDocument } from '@/types';
 import React, { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 
@@ -11,22 +11,27 @@ interface AuthContextType {
   signup: (email: string) => void;
   logout: () => void;
   updateUserProfile: (updatedData: Partial<UserProfileData>) => void;
+  addRotaDocument: (rotaDocument: RotaDocument) => void;
+  updateRotaDocument: (rotaDocument: RotaDocument) => void;
+  deleteRotaDocument: (rotaId: string) => void;
   loading: boolean;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const defaultScheduleMeta: ScheduleMetadata = {
-  wtrOptOut: false,
-  scheduleTotalWeeks: 4,
-  scheduleStartDate: new Date().toISOString().split('T')[0],
-  annualLeaveEntitlement: 27,
-  hoursInNormalDay: 8,
-};
+const initializeNewUser = (email: string): User => ({
+  id: crypto.randomUUID(),
+  email,
+  grade: undefined,
+  region: undefined,
+  taxCode: undefined,
+  hasStudentLoan: false,
+  hasPostgraduateLoan: false,
+  nhsPensionOptIn: true,
+  isProfileComplete: false,
+  rotas: [], // Initialize with an empty array for rotas
+});
 
-const defaultShiftDefinitions: ShiftDefinition[] = [{ id: crypto.randomUUID(), dutyCode: 'S1', name: 'Standard Day', type: 'normal' as 'normal' | 'on-call', startTime: '09:00', finishTime: '17:00', durationStr: '8h 0m' }];
-
-const defaultRotaGrid: RotaGridInput = {};
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -39,18 +44,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const storedUser = localStorage.getItem('rotaCalcUser');
       if (storedUser) {
         const parsedUser: User = JSON.parse(storedUser);
-        // Ensure essential defaults if profile is incomplete from an older version
-        if (!parsedUser.scheduleMeta) {
-          parsedUser.scheduleMeta = { ...defaultScheduleMeta };
-        }
-        if (!parsedUser.shiftDefinitions || parsedUser.shiftDefinitions.length === 0) {
-          parsedUser.shiftDefinitions = [...defaultShiftDefinitions.map(def => ({...def, id: crypto.randomUUID()}))];
-        }
-        if (!parsedUser.rotaGrid) {
-            parsedUser.rotaGrid = { ...defaultRotaGrid };
-        }
         if (typeof parsedUser.isProfileComplete === 'undefined') {
-            parsedUser.isProfileComplete = false; // Default for older users
+            parsedUser.isProfileComplete = false; 
+        }
+        if (!parsedUser.rotas) { // Ensure rotas array exists
+            parsedUser.rotas = [];
         }
         setUser(parsedUser);
       }
@@ -62,25 +60,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (!loading && user && !user.isProfileComplete && pathname !== '/profile/setup' && pathname !== '/login' && pathname !== '/signup') {
+    if (!loading && user && !user.isProfileComplete && 
+        pathname !== '/profile/setup' && 
+        pathname !== '/login' && 
+        pathname !== '/signup') {
       router.push('/profile/setup');
     }
   }, [user, loading, router, pathname]);
-
-  const initializeNewUser = useCallback((email: string): User => ({
-    id: crypto.randomUUID(), 
-    email,
-    grade: undefined,
-    region: undefined,
-    taxCode: undefined,
-    hasStudentLoan: false,
-    hasPostgraduateLoan: false,
-    nhsPensionOptIn: true,
-    isProfileComplete: false,
-    scheduleMeta: { ...defaultScheduleMeta },
-    shiftDefinitions: [...defaultShiftDefinitions.map(def => ({...def, id: crypto.randomUUID()}))],
-    rotaGrid: { ...defaultRotaGrid },
-  }), []);
 
   const login = useCallback((email: string) => {
     let existingUser: User | null = null;
@@ -90,10 +76,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const parsed: User = JSON.parse(storedUser);
         if (parsed.email === email) { 
             existingUser = parsed;
-            if (!existingUser.scheduleMeta) existingUser.scheduleMeta = { ...defaultScheduleMeta };
-            if (!existingUser.shiftDefinitions || existingUser.shiftDefinitions.length === 0) existingUser.shiftDefinitions = [...defaultShiftDefinitions.map(def => ({...def, id: crypto.randomUUID()}))];
-            if (!existingUser.rotaGrid) existingUser.rotaGrid = { ...defaultRotaGrid };
             if (typeof existingUser.isProfileComplete === 'undefined') existingUser.isProfileComplete = false;
+            if (!existingUser.rotas) existingUser.rotas = [];
         }
       }
     } catch (error) {
@@ -139,7 +123,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const updateUserProfile = useCallback((updatedData: Partial<UserProfileData>) => {
     setUser(prevUser => {
       if (!prevUser) return null;
-      const newUser = { ...prevUser, ...updatedData };
+      // Ensure rotas array is preserved if not part of updatedData
+      const newRotas = updatedData.rotas || prevUser.rotas;
+      const newUser = { ...prevUser, ...updatedData, rotas: newRotas };
       try {
         localStorage.setItem('rotaCalcUser', JSON.stringify(newUser));
       } catch (error) {
@@ -149,8 +135,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, []);
 
+  const addRotaDocument = useCallback((rotaDocument: RotaDocument) => {
+    setUser(prevUser => {
+        if (!prevUser) return null;
+        const updatedRotas = [...(prevUser.rotas || []), rotaDocument];
+        const newUser = { ...prevUser, rotas: updatedRotas };
+        localStorage.setItem('rotaCalcUser', JSON.stringify(newUser));
+        return newUser;
+    });
+  }, []);
+
+  const updateRotaDocument = useCallback((updatedRotaDoc: RotaDocument) => {
+    setUser(prevUser => {
+        if (!prevUser || !prevUser.rotas) return prevUser;
+        const updatedRotas = prevUser.rotas.map(rota => 
+            rota.id === updatedRotaDoc.id ? updatedRotaDoc : rota
+        );
+        const newUser = { ...prevUser, rotas: updatedRotas };
+        localStorage.setItem('rotaCalcUser', JSON.stringify(newUser));
+        return newUser;
+    });
+  }, []);
+
+  const deleteRotaDocument = useCallback((rotaId: string) => {
+    setUser(prevUser => {
+        if (!prevUser || !prevUser.rotas) return prevUser;
+        const updatedRotas = prevUser.rotas.filter(rota => rota.id !== rotaId);
+        const newUser = { ...prevUser, rotas: updatedRotas };
+        localStorage.setItem('rotaCalcUser', JSON.stringify(newUser));
+        return newUser;
+    });
+  }, []);
+
+
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout, updateUserProfile, loading }}>
+    <AuthContext.Provider value={{ user, login, signup, logout, updateUserProfile, addRotaDocument, updateRotaDocument, deleteRotaDocument, loading }}>
       {children}
     </AuthContext.Provider>
   );
