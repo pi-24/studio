@@ -64,14 +64,16 @@ const CustomCalendarDay: React.FC<CustomCalendarDayProps> = ({
             <div
               key={event.id}
               className={cn(
-                "text-xxs leading-tight p-0.5 rounded-sm flex items-center gap-1 text-white dark:text-opacity-90",
-                event.color || 'bg-primary',
-                'truncate'
+                "text-xxs p-0.5 rounded-sm text-white dark:text-opacity-90",
+                event.color || 'bg-primary'
               )}
-              title={`${event.title} (${format(event.start, 'HH:mm')})`}
+              title={`${event.title}\n${format(event.start, 'HH:mm')} - ${format(event.end, 'HH:mm')}${!isSameDay(event.start, event.end) ? " (next day)" : ""}`}
             >
-              <span className="font-medium truncate">{event.title}</span>
-              <span className="text-white/70 dark:text-white/60 shrink-0">{format(event.start, 'HH:mm')}</span>
+              <div className="font-medium truncate">{event.title}</div>
+              <div className="text-white/70 dark:text-white/60">
+                {format(event.start, 'HH:mm')} - {format(event.end, 'HH:mm')}
+                {!isSameDay(event.start, event.end) && " (next day)"}
+              </div>
             </div>
           ))}
           {hiddenEventsCount > 0 && (
@@ -91,5 +93,3 @@ const CustomCalendarDay: React.FC<CustomCalendarDayProps> = ({
 };
 
 export default CustomCalendarDay;
-
-    
