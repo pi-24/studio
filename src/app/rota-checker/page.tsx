@@ -24,22 +24,16 @@ export default function RotaCheckerPage() {
   const [initialLoadProcessing, setInitialLoadProcessing] = useState(true);
 
 
-  // This function is called by RotaInputForm when the user submits changes to the grid
-  const handleRotaGridSubmit = useCallback(async (submittedRotaGrid: RotaGridInput) => {
+  const handleRotaGridSubmit = useCallback(async (submittedFullRotaInput: RotaInput) => {
     if (!user || !user.scheduleMeta || !user.shiftDefinitions) {
       setRotaResult({ error: "User profile data is incomplete. Cannot process rota." });
-      setIsProcessing(false); // Ensure processing state is reset
+      setIsProcessing(false);
       return;
     }
     setIsProcessing(true);
 
-    const fullRotaInput: RotaInput = {
-        scheduleMeta: user.scheduleMeta,
-        shiftDefinitions: user.shiftDefinitions,
-        rotaGrid: submittedRotaGrid,
-    };
-
-    const result = await processRota(fullRotaInput);
+    // The submittedFullRotaInput already contains scheduleMeta, shiftDefinitions, and the actual rotaGrid
+    const result = await processRota(submittedFullRotaInput);
     setRotaResult(result);
     setIsProcessing(false);
 
@@ -47,41 +41,37 @@ export default function RotaCheckerPage() {
       toast({ title: "Processing Error", description: result.error, variant: "destructive" });
     } else {
       toast({ title: "Rota Processed", description: "Compliance checks updated." });
-      // Only update profile if the submitted grid is different from what's currently stored for the user
+      
       const currentGridString = user.rotaGrid ? JSON.stringify(user.rotaGrid) : "{}";
-      const submittedGridString = JSON.stringify(submittedRotaGrid);
+      const submittedGridDataString = JSON.stringify(submittedFullRotaInput.rotaGrid);
 
-      if (currentGridString !== submittedGridString) {
-        updateUserProfile({ rotaGrid: submittedRotaGrid });
+      if (currentGridString !== submittedGridDataString) {
+        // Ensure we only save the flat rotaGrid part to user.rotaGrid
+        updateUserProfile({ rotaGrid: submittedFullRotaInput.rotaGrid });
       }
     }
   }, [user, toast, updateUserProfile]);
 
 
-  // Effect for initial load processing when the page mounts or critical user data changes
   useEffect(() => {
     if (!authLoading && user && user.isProfileComplete && user.scheduleMeta && user.shiftDefinitions) {
       if (user.rotaGrid && Object.keys(user.rotaGrid).length > 0) {
         const processInitialData = async () => {
-          setIsProcessing(true); // Use general isProcessing here for consistency
+          setIsProcessing(true);
           const initialFullRotaInput: RotaInput = {
-            scheduleMeta: user.scheduleMeta as ScheduleMetadata, // Cast as non-null
-            shiftDefinitions: user.shiftDefinitions as ShiftDefinition[], // Cast
-            rotaGrid: user.rotaGrid as RotaGridInput, // Cast
+            scheduleMeta: user.scheduleMeta as ScheduleMetadata,
+            shiftDefinitions: user.shiftDefinitions as ShiftDefinition[],
+            rotaGrid: user.rotaGrid as RotaGridInput, 
           };
           const result = await processRota(initialFullRotaInput);
           setRotaResult(result);
           setIsProcessing(false);
           setInitialLoadProcessing(false);
-          // No toast for initial load to avoid annoyance, or a very subtle one
-          // if ('error' in result) {
-          //   toast({ title: "Initial Rota Load Error", description: result.error, variant: "destructive" });
-          // }
         };
         processInitialData();
       } else {
         setInitialLoadProcessing(false);
-        setRotaResult(null); // Ensure report is cleared if grid is empty
+        setRotaResult(null); 
       }
     } else if (!authLoading && (!user || !user.isProfileComplete)) {
       router.push('/profile/setup');
@@ -90,12 +80,11 @@ export default function RotaCheckerPage() {
       toast({title: "Configuration Error", description: "Rota settings or shift types are missing. Please update your profile.", variant: "destructive"});
       setRotaResult({ error: "Rota settings or shift types are missing. Please update your profile."});
     } else if (authLoading) {
-      // Still loading, do nothing yet, wait for auth state to resolve
+      // Still loading
     } else {
-      // Catch-all for other states, e.g. user is null but auth not loading (should be caught by login redirect)
       setInitialLoadProcessing(false);
     }
-  }, [user, authLoading, router, toast]); // Dependencies for initial load
+  }, [user, authLoading, router, toast ]); 
 
 
   if (authLoading || initialLoadProcessing) {
@@ -108,11 +97,11 @@ export default function RotaCheckerPage() {
   }
 
   if (!user) {
-    return <p>Redirecting to login...</p>; // Should be handled by AuthProvider
+    return <p>Redirecting to login...</p>; 
   }
 
   if (!user.isProfileComplete) {
-    return <p>Redirecting to profile setup...</p>; // Should be handled by AuthProvider
+    return <p>Redirecting to profile setup...</p>; 
   }
   
   if (!user.scheduleMeta || !user.shiftDefinitions) {
