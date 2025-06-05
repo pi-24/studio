@@ -11,7 +11,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { UserCircle, Mail, LogOut, Briefcase, MapPin, Percent, Landmark, ShieldCheck, Settings2, Trash2, PlusCircle, Save, CalendarDays, Edit, ExternalLink } from 'lucide-react';
+import { UserCircle, Mail, LogOut, Briefcase, MapPin, Percent, Landmark, ShieldCheck, Settings2, Trash2, PlusCircle, Save, CalendarDays, Edit } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -44,8 +44,8 @@ const scheduleMetadataSchema = z.object({
 const rotaGridSchema = z.record(z.string());
 
 const profileEditSchema = z.object({
-  grade: z.enum(userGradeOptions).optional(),
-  region: z.enum(ukRegionOptions).optional(),
+  grade: z.enum(userGradeOptions).optional().or(z.literal('')),
+  region: z.enum(ukRegionOptions).optional().or(z.literal('')),
   taxCode: z.string().optional(),
   hasStudentLoan: z.boolean().optional(),
   hasPostgraduateLoan: z.boolean().optional(),
@@ -97,8 +97,8 @@ export default function ProfilePage() {
   const { control, handleSubmit, register, formState: { errors, isSubmitting, isDirty }, reset, watch, setValue } = useForm<ProfileEditFormValues>({
     resolver: zodResolver(profileEditSchema),
     defaultValues: {
-      grade: undefined,
-      region: undefined,
+      grade: undefined, // Use undefined so RHF treats it as initially unset
+      region: undefined, // Use undefined
       taxCode: '',
       hasStudentLoan: false,
       hasPostgraduateLoan: false,
@@ -122,8 +122,8 @@ export default function ProfilePage() {
       router.push('/login');
     } else if (user) {
       reset({
-        grade: user.grade || undefined,
-        region: user.region || undefined,
+        grade: user.grade || '', // Use '' if undefined/null from user
+        region: user.region || '', // Use '' if undefined/null from user
         taxCode: user.taxCode || '',
         hasStudentLoan: user.hasStudentLoan || false,
         hasPostgraduateLoan: user.hasPostgraduateLoan || false,
@@ -133,7 +133,7 @@ export default function ProfilePage() {
         rotaGrid: user.rotaGrid || {},
       });
     }
-  }, [user, authLoading, router, reset, defaultScheduleMetaValues, defaultShiftDefinitionsValues]);
+  }, [user, authLoading, router, reset]);
   
   useEffect(() => {
     if (watchedShiftDefinitions) {
@@ -153,7 +153,9 @@ export default function ProfilePage() {
     if (user) {
       const profileUpdateData: Partial<UserProfileData> = {
         ...data, 
-        isProfileComplete: true, // Ensure this remains true or is set if they are editing
+        grade: data.grade === '' ? undefined : data.grade, // Convert '' back to undefined for storage if desired
+        region: data.region === '' ? undefined : data.region,
+        isProfileComplete: true, 
       };
       updateUserProfile(profileUpdateData);
       toast({ title: "Profile Updated", description: "Your changes have been saved." });
@@ -215,7 +217,7 @@ export default function ProfilePage() {
               <div>
                 <Label htmlFor="grade">Grade</Label>
                 <Controller name="grade" control={control} render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger id="grade"><SelectValue placeholder="Select grade" /></SelectTrigger>
                       <SelectContent>{userGradeOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
                     </Select> )}
@@ -225,7 +227,7 @@ export default function ProfilePage() {
               <div>
                 <Label htmlFor="region">Region of Work (UK)</Label>
                 <Controller name="region" control={control} render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger id="region"><SelectValue placeholder="Select region" /></SelectTrigger>
                       <SelectContent>{ukRegionOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
                     </Select> )}
@@ -384,5 +386,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
-    
