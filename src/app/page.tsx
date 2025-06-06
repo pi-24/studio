@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { AlertTriangle, Settings, CreditCard, ExternalLink, PlusCircle, CalendarDays, FolderKanban, Info, CheckCircle2, HelpCircle, Trash2 } from 'lucide-react';
+import { AlertTriangle, Settings, Currency, ExternalLink, PlusCircle, CalendarDays, FolderKanban, Info, CheckCircle2, HelpCircle, Trash2 } from 'lucide-react';
 import type { RotaDocument } from '@/types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from "@/hooks/use-toast";
@@ -175,7 +175,7 @@ export default function DashboardPage() {
                         </Tooltip>
                         <Button asChild variant="outline" size="sm" className="flex-1 justify-start text-left">
                           <Link href="/pay-checker/coming-soon">
-                            <CreditCard className="h-4 w-4 text-primary/80" />
+                            <Currency className="h-4 w-4 text-primary/80" />
                             <span className="ml-2">Estimated Pay Results</span>
                           </Link>
                         </Button>
