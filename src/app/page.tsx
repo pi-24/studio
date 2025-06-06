@@ -213,25 +213,6 @@ export default function DashboardPage() {
             </Button>
           </CardContent>
         </Card>
-
-        {/* "Manage Your Personal Profile" Card - This remains */}
-        <Card className="mt-10 shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-xl font-semibold text-primary flex items-center gap-2">
-              <Settings className="h-5 w-5" /> Manage Your Personal Profile
-            </CardTitle>
-            <CardDescription>
-              Update your grade, region, tax details, and other personal information. Rota-specific details are managed via "Upload New Rota" or by editing an existing rota.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild variant="outline">
-              <Link href="/profile">
-                Go to Profile <ExternalLink className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
       </div>
     </TooltipProvider>
   );
