@@ -1,9 +1,10 @@
+
 "use client";
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
-import { LogIn, LogOut, UserCircle, UserPlus } from 'lucide-react';
+import { LogIn, LogOut, UserCircle, UserPlus, LayoutDashboard } from 'lucide-react';
 
 export default function AuthButtons() {
   const { user, logout, loading } = useAuth();
@@ -15,6 +16,12 @@ export default function AuthButtons() {
   if (user) {
     return (
       <div className="flex items-center gap-2">
+        <Button variant="ghost" asChild>
+          <Link href="/">
+            <LayoutDashboard className="mr-2 h-4 w-4" />
+            My Dashboard
+          </Link>
+        </Button>
         <Button variant="ghost" asChild>
           <Link href="/profile">
             <UserCircle className="mr-2 h-4 w-4" />
