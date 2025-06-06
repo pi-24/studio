@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { AlertTriangle, Settings, CreditCard, ExternalLink, PlusCircle, CalendarDays, FolderKanban, Info, CheckCircle2, HelpCircle, Edit, Trash2 } from 'lucide-react';
+import { AlertTriangle, Settings, CreditCard, ExternalLink, PlusCircle, CalendarDays, FolderKanban, Info, CheckCircle2, HelpCircle, Trash2 } from 'lucide-react';
 import type { RotaDocument } from '@/types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from "@/hooks/use-toast";
@@ -135,12 +135,6 @@ export default function DashboardPage() {
                           </p>
                         </div>
                         <div className="flex flex-col sm:flex-row gap-2 items-end sm:items-center flex-shrink-0">
-                           <Button asChild variant="outline" size="sm">
-                             <Link href={`/rota-checker?rotaId=${rota.id}`}>
-                               <Edit className="h-4 w-4 sm:mr-2" />
-                               <span className="hidden sm:inline">Edit</span>
-                             </Link>
-                           </Button>
                            <AlertDialog>
                              <AlertDialogTrigger asChild>
                                <Button variant="destructive" size="sm">
