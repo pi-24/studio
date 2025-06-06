@@ -141,10 +141,10 @@ export default function RotaCheckerPage() {
             </div>
         </CardHeader>
         <CardContent>
-            <Accordion type="single" collapsible defaultValue="item-1" className="w-full">
+            <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="item-1">
                     <AccordionTrigger className="text-lg font-medium hover:no-underline">
-                        View/Hide Rota Configuration & Grid
+                        View Rota Configuration & Grid
                     </AccordionTrigger>
                     <AccordionContent className="pt-4 space-y-6">
                         <div>
