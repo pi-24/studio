@@ -101,18 +101,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (loading) return;
 
+    const allowedPublicPaths = ['/login', '/signup', '/about'];
+
     if (user) {
-      if (!user.isProfileComplete && pathname !== '/profile/setup' && pathname !== '/login' && pathname !== '/signup') {
+      if (!user.isProfileComplete && pathname !== '/profile/setup' && !allowedPublicPaths.includes(pathname)) {
         router.push('/profile/setup');
       } else if (user.isProfileComplete && (pathname === '/login' || pathname === '/signup')) {
         router.push('/');
       }
     } else { // No user
-      if (pathname !== '/login' && pathname !== '/signup') {
-        // Allow access to /profile/setup only if it were a public "start here" page for all,
-        // but since it's post-signup, it shouldn't be accessed without a user.
-        // So, any non-login/signup page without a user redirects to login.
-        router.push('/login');
+      if (!allowedPublicPaths.includes(pathname) && pathname !== '/profile/setup') { // also protect profile/setup if no user
+        router.push('/about'); // Default to about page if not logged in and not on an allowed public path
       }
     }
   }, [user, loading, router, pathname]);
@@ -128,8 +127,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             // Ensure backward compatibility for isProfileComplete and rotas
             if (typeof existingUser.isProfileComplete === 'undefined') existingUser.isProfileComplete = false;
             if (!existingUser.rotas) existingUser.rotas = [];
-            // Potentially re-run the robust mapping for rotas here if concerned about old data format
-            // For simplicity, assuming the main useEffect handles parsing on initial load
         }
       }
     } catch (error) {
@@ -169,7 +166,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error("Failed to remove user from localStorage", error);
     }
-    router.push('/login');
+    router.push('/about'); // Changed from '/login' to '/about'
   }, [router]);
 
   const updateUserProfile = useCallback((updatedData: Partial<UserProfileData>) => {
@@ -225,5 +222,3 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     </AuthContext.Provider>
   );
 };
-
-    
