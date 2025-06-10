@@ -45,7 +45,7 @@ const getPatternDayIndex = (date: Date): number => {
 };
 
 // Helper to format date to ICS UTC format YYYYMMDDTHHMMSSZ
-const formatDateToICS = (date: Date): string => {
+const formatDateToICS_UTC = (date: Date): string => {
   const pad = (num: number) => (num < 10 ? '0' : '') + num;
   return (
     date.getUTCFullYear() +
@@ -56,6 +56,21 @@ const formatDateToICS = (date: Date): string => {
     pad(date.getUTCMinutes()) +
     pad(date.getUTCSeconds()) +
     'Z'
+  );
+};
+
+// Helper to format date to ICS Local Floating format YYYYMMDDTHHMMSS
+const formatDateToICS_Local = (date: Date): string => {
+  const pad = (num: number) => (num < 10 ? '0' : '') + num;
+  return (
+    date.getFullYear() + // Local Year
+    pad(date.getMonth() + 1) + // Local Month
+    pad(date.getDate()) + // Local Day
+    'T' +
+    pad(date.getHours()) + // Local Hour
+    pad(date.getMinutes()) + // Local Minute
+    pad(date.getSeconds()) // Local Second
+    // No 'Z' for floating time
   );
 };
 
@@ -80,9 +95,9 @@ const generateICSFileContent = (events: DisplayEvent[]): string => {
 
     icsString += 'BEGIN:VEVENT\r\n';
     icsString += `UID:${event.id}@rotacalc.app\r\n`; // Make UID more robust
-    icsString += `DTSTAMP:${formatDateToICS(new Date())}\r\n`;
-    icsString += `DTSTART:${formatDateToICS(event.start)}\r\n`;
-    icsString += `DTEND:${formatDateToICS(event.end)}\r\n`;
+    icsString += `DTSTAMP:${formatDateToICS_UTC(new Date())}\r\n`; // DTSTAMP should be UTC
+    icsString += `DTSTART:${formatDateToICS_Local(event.start)}\r\n`; // Use local floating time
+    icsString += `DTEND:${formatDateToICS_Local(event.end)}\r\n`;     // Use local floating time
     icsString += `SUMMARY:${event.title}\r\n`;
     icsString += `DESCRIPTION:${description}\r\n`;
     icsString += `LOCATION:${event.site}\r\n`;
