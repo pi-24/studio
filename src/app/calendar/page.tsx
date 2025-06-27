@@ -82,6 +82,26 @@ const generateICSFileContent = (events: DisplayEvent[]): string => {
   icsString += 'PRODID:-//OnTheDoc//YourApp//EN\r\n';
   icsString += 'CALSCALE:GREGORIAN\r\n';
 
+  // VTIMEZONE component for Europe/London (GMT/BST)
+  icsString += 'BEGIN:VTIMEZONE\r\n';
+  icsString += 'TZID:Europe/London\r\n';
+  icsString += 'BEGIN:DAYLIGHT\r\n';
+  icsString += 'TZOFFSETFROM:+0000\r\n';
+  icsString += 'TZOFFSETTO:+0100\r\n';
+  icsString += 'TZNAME:BST\r\n';
+  icsString += 'DTSTART:19700329T010000\r\n';
+  icsString += 'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU\r\n';
+  icsString += 'END:DAYLIGHT\r\n';
+  icsString += 'BEGIN:STANDARD\r\n';
+  icsString += 'TZOFFSETFROM:+0100\r\n';
+  icsString += 'TZOFFSETTO:+0000\r\n';
+  icsString += 'TZNAME:GMT\r\n';
+  icsString += 'DTSTART:19701025T020000\r\n';
+  icsString += 'RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU\r\n';
+  icsString += 'END:STANDARD\r\n';
+  icsString += 'END:VTIMEZONE\r\n';
+
+
   events.forEach(event => {
     const descriptionParts = [
       `Rota: ${event.rotaName}`,
@@ -91,14 +111,13 @@ const generateICSFileContent = (events: DisplayEvent[]): string => {
     if (event.type === 'on-call') {
       descriptionParts.push('(On-Call)');
     }
-    descriptionParts.push(`(Time shown is local UK time)`);
-    const description = descriptionParts.join('\\n'); // \n for newlines in ICS description
+    const description = descriptionParts.join('\\n');
 
     icsString += 'BEGIN:VEVENT\r\n';
-    icsString += `UID:${event.id}@OnTheDoc.app\r\n`; // Make UID more robust
-    icsString += `DTSTAMP:${formatDateToICS_UTC(new Date())}\r\n`; // DTSTAMP should be UTC
-    icsString += `DTSTART:${formatDateToICS_Local(event.start)}\r\n`; // Use local floating time
-    icsString += `DTEND:${formatDateToICS_Local(event.end)}\r\n`;     // Use local floating time
+    icsString += `UID:${event.id}@OnTheDoc.app\r\n`;
+    icsString += `DTSTAMP:${formatDateToICS_UTC(new Date())}\r\n`;
+    icsString += `DTSTART;TZID=Europe/London:${formatDateToICS_Local(event.start)}\r\n`;
+    icsString += `DTEND;TZID=Europe/London:${formatDateToICS_Local(event.end)}\r\n`;
     icsString += `SUMMARY:${event.title}\r\n`;
     icsString += `DESCRIPTION:${description}\r\n`;
     icsString += `LOCATION:${event.site}\r\n`;
@@ -386,3 +405,5 @@ export default function MyCalendarPage() {
     </div>
   );
 }
+
+    
