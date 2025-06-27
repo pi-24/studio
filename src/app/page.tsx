@@ -71,7 +71,7 @@ export default function DashboardPage() {
             <CardTitle className="text-2xl text-primary flex items-center justify-center gap-2">
               <AlertTriangle className="h-6 w-6 text-amber-500" /> Almost there!
             </CardTitle>
-            <CardDescription>Please complete your profile setup to use RotaCalc.</CardDescription>
+            <CardDescription>Please complete your profile setup to use OnTheDoc.</CardDescription>
           </CardHeader>
           <CardContent>
             <p className="mb-6">Your profile information needs to be configured before you can access the dashboard.</p>
@@ -93,7 +93,7 @@ export default function DashboardPage() {
       <div className="space-y-10">
         <Card className="shadow-lg border-primary/20">
           <CardHeader>
-            <CardTitle className="text-3xl font-headline text-primary">Welcome to RotaCalc, {user.email?.split('@')[0]}!</CardTitle>
+            <CardTitle className="text-3xl font-headline text-primary">Welcome to OnTheDoc, {user.email?.split('@')[0]}!</CardTitle>
             <CardDescription className="text-md mt-1">
               Manage your rotas, check compliance, and estimate pay.
             </CardDescription>

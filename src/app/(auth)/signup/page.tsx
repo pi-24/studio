@@ -2,8 +2,8 @@ import SignupForm from '@/components/auth/SignupForm';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Sign Up - RotaCalc',
-  description: 'Create a new RotaCalc account.',
+  title: 'Sign Up - OnTheDoc',
+  description: 'Create a new OnTheDoc account.',
 };
 
 export default function SignupPage() {

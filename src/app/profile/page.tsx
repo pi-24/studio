@@ -105,7 +105,7 @@ export default function ProfilePage() {
             <AvatarFallback>{userInitial}</AvatarFallback>
           </Avatar>
           <CardTitle className="text-3xl font-headline flex items-center gap-2"><UserCircle className="text-primary h-8 w-8"/>User Profile</CardTitle>
-          <CardDescription>Manage your RotaCalc account details and preferences.</CardDescription>
+          <CardDescription>Manage your OnTheDoc account details and preferences.</CardDescription>
         </CardHeader>
         
         <form onSubmit={handleSubmit(onSubmit)}>

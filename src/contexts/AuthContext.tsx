@@ -41,7 +41,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     try {
-      const storedUser = localStorage.getItem('rotaCalcUser');
+      const storedUser = localStorage.getItem('OnTheDocUser');
       if (storedUser) {
         const parsedUser: User = JSON.parse(storedUser);
         
@@ -93,7 +93,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (error) {
       console.error("Failed to parse user from localStorage or migrate rota structure:", error);
-      // localStorage.removeItem('rotaCalcUser'); // Optionally clear corrupted data
+      // localStorage.removeItem('OnTheDocUser'); // Optionally clear corrupted data
     }
     setLoading(false);
   }, []);
@@ -119,7 +119,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = useCallback((email: string) => {
     let existingUser: User | null = null;
     try {
-      const storedUser = localStorage.getItem('rotaCalcUser');
+      const storedUser = localStorage.getItem('OnTheDocUser');
       if (storedUser) {
         const parsed: User = JSON.parse(storedUser);
         if (parsed.email === email) { 
@@ -136,7 +136,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const currentUser = existingUser || initializeNewUser(email);
     setUser(currentUser);
     try {
-      localStorage.setItem('rotaCalcUser', JSON.stringify(currentUser));
+      localStorage.setItem('OnTheDocUser', JSON.stringify(currentUser));
     } catch (error) {
       console.error("Failed to set user in localStorage", error);
     }
@@ -152,7 +152,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const newUser = initializeNewUser(email);
     setUser(newUser);
     try {
-      localStorage.setItem('rotaCalcUser', JSON.stringify(newUser));
+      localStorage.setItem('OnTheDocUser', JSON.stringify(newUser));
     } catch (error) {
       console.error("Failed to set user in localStorage during signup", error);
     }
@@ -162,7 +162,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = useCallback(() => {
     setUser(null);
     try {
-      localStorage.removeItem('rotaCalcUser');
+      localStorage.removeItem('OnTheDocUser');
     } catch (error) {
       console.error("Failed to remove user from localStorage", error);
     }
@@ -175,7 +175,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const newRotas = updatedData.rotas || prevUser.rotas; // Preserve rotas if not in updatedData
       const newUser = { ...prevUser, ...updatedData, rotas: newRotas };
       try {
-        localStorage.setItem('rotaCalcUser', JSON.stringify(newUser));
+        localStorage.setItem('OnTheDocUser', JSON.stringify(newUser));
       } catch (error) {
         console.error("Failed to update user in localStorage", error);
       }
@@ -188,7 +188,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!prevUser) return null;
         const updatedRotas = [...(prevUser.rotas || []), rotaDocument];
         const newUser = { ...prevUser, rotas: updatedRotas };
-        localStorage.setItem('rotaCalcUser', JSON.stringify(newUser));
+        localStorage.setItem('OnTheDocUser', JSON.stringify(newUser));
         return newUser;
     });
   }, []);
@@ -200,7 +200,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             rota.id === updatedRotaDoc.id ? updatedRotaDoc : rota
         );
         const newUser = { ...prevUser, rotas: updatedRotas };
-        localStorage.setItem('rotaCalcUser', JSON.stringify(newUser));
+        localStorage.setItem('OnTheDocUser', JSON.stringify(newUser));
         return newUser;
     });
   }, []);
@@ -210,7 +210,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!prevUser || !prevUser.rotas) return prevUser;
         const updatedRotas = prevUser.rotas.filter(rota => rota.id !== rotaId);
         const newUser = { ...prevUser, rotas: updatedRotas };
-        localStorage.setItem('rotaCalcUser', JSON.stringify(newUser));
+        localStorage.setItem('OnTheDocUser', JSON.stringify(newUser));
         return newUser;
     });
   }, []);

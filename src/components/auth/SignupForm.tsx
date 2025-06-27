@@ -47,7 +47,7 @@ export default function SignupForm() {
   return (
     <Card className="shadow-xl">
       <CardHeader>
-        <CardTitle className="text-2xl font-headline flex items-center gap-2"><UserPlus className="text-primary"/>Create RotaCalc Account</CardTitle>
+        <CardTitle className="text-2xl font-headline flex items-center gap-2"><UserPlus className="text-primary"/>Create OnTheDoc Account</CardTitle>
         <CardDescription>Sign up to start managing your rota and salary.</CardDescription>
       </CardHeader>
       <CardContent>

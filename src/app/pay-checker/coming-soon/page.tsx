@@ -9,7 +9,7 @@ import type { Metadata } from 'next';
 
 // export const metadata: Metadata = { // Metadata needs to be defined outside client component
 //   title: 'Pay Estimator - Coming Soon',
-//   description: 'RotaCalc Pay Estimator feature is under development.',
+//   description: 'OnTheDoc Pay Estimator feature is under development.',
 // };
 // For client components, Metadata should be handled in a parent server component or layout if needed globally.
 // Or use document.title directly if simple. For now, we'll omit static metadata from here.

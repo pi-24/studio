@@ -9,8 +9,8 @@ import type { Metadata } from 'next';
 
 // For client components, Metadata should be handled in a parent server component or layout if needed globally.
 // export const metadata: Metadata = {
-//   title: 'About RotaCalc',
-//   description: 'Learn more about RotaCalc - Your NHS Rota Compliance and Salary Tool.',
+//   title: 'About OnTheDoc',
+//   description: 'Learn more about OnTheDoc - Your NHS Rota Compliance and Salary Tool.',
 // };
 
 export default function AboutPage() {
@@ -21,14 +21,14 @@ export default function AboutPage() {
           <div className="mx-auto bg-primary/10 p-4 rounded-full w-fit mb-4">
             <Calculator className="h-12 w-12 text-primary" />
           </div>
-          <CardTitle className="text-3xl font-headline text-primary">Welcome to RotaCalc!</CardTitle>
+          <CardTitle className="text-3xl font-headline text-primary">Welcome to OnTheDoc!</CardTitle>
           <CardDescription className="text-lg text-muted-foreground mt-2">
             Your essential tool for managing NHS rotas, ensuring compliance, and estimating your pay.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 px-6 py-8">
           <p className="text-center text-card-foreground">
-            RotaCalc is designed specifically for NHS professionals to simplify the complexities of work schedules.
+            OnTheDoc is designed specifically for NHS professionals to simplify the complexities of work schedules.
           </p>
           <ul className="space-y-3">
             {[
@@ -45,7 +45,7 @@ export default function AboutPage() {
             ))}
           </ul>
           <p className="text-center text-card-foreground pt-4">
-            Take control of your work-life balance and finances with RotaCalc.
+            Take control of your work-life balance and finances with OnTheDoc.
           </p>
         </CardContent>
         <CardFooter className="flex flex-col sm:flex-row gap-4 justify-center pt-6 border-t">

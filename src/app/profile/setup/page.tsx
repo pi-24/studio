@@ -80,7 +80,7 @@ export default function ProfileSetupPage() {
       <Card className="max-w-xl mx-auto shadow-xl">
         <CardHeader>
           <CardTitle className="text-3xl font-headline text-primary flex items-center gap-2"><User className="h-7 w-7"/>Complete Your Profile</CardTitle>
-          <CardDescription>Please provide some details about yourself to get started with RotaCalc.</CardDescription>
+          <CardDescription>Please provide some details about yourself to get started with OnTheDoc.</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit(onSubmit)}>
           <CardContent className="space-y-6 pt-6">

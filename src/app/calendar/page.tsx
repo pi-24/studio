@@ -79,7 +79,7 @@ const generateICSFileContent = (events: DisplayEvent[]): string => {
   let icsString = '';
   icsString += 'BEGIN:VCALENDAR\r\n';
   icsString += 'VERSION:2.0\r\n';
-  icsString += 'PRODID:-//RotaCalc//YourApp//EN\r\n';
+  icsString += 'PRODID:-//OnTheDoc//YourApp//EN\r\n';
   icsString += 'CALSCALE:GREGORIAN\r\n';
 
   events.forEach(event => {
@@ -91,10 +91,11 @@ const generateICSFileContent = (events: DisplayEvent[]): string => {
     if (event.type === 'on-call') {
       descriptionParts.push('(On-Call)');
     }
+    descriptionParts.push(`(Time shown is local UK time)`);
     const description = descriptionParts.join('\\n'); // \n for newlines in ICS description
 
     icsString += 'BEGIN:VEVENT\r\n';
-    icsString += `UID:${event.id}@rotacalc.app\r\n`; // Make UID more robust
+    icsString += `UID:${event.id}@OnTheDoc.app\r\n`; // Make UID more robust
     icsString += `DTSTAMP:${formatDateToICS_UTC(new Date())}\r\n`; // DTSTAMP should be UTC
     icsString += `DTSTART:${formatDateToICS_Local(event.start)}\r\n`; // Use local floating time
     icsString += `DTEND:${formatDateToICS_Local(event.end)}\r\n`;     // Use local floating time
@@ -242,7 +243,7 @@ export default function MyCalendarPage() {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", "rotacalc_shifts.ics");
+    link.setAttribute("download", "OnTheDoc_shifts.ics");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

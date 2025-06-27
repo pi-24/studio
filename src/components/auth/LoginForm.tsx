@@ -43,7 +43,7 @@ export default function LoginForm() {
   return (
     <Card className="shadow-xl">
       <CardHeader>
-        <CardTitle className="text-2xl font-headline flex items-center gap-2"><LogIn className="text-primary"/>Login to RotaCalc</CardTitle>
+        <CardTitle className="text-2xl font-headline flex items-center gap-2"><LogIn className="text-primary"/>Login to OnTheDoc</CardTitle>
         <CardDescription>Enter your credentials to access your rota dashboard.</CardDescription>
       </CardHeader>
       <CardContent>

@@ -14,8 +14,8 @@ import Footer from '@/components/Footer';
 // which is then configured in tailwind.config.ts to use 'Inter'.
 
 export const metadata: Metadata = {
-  title: 'RotaCalc - NHS Rota Compliance & Salary Tool',
-  description: 'Easily input your rota, check compliance against NHS guidelines, and estimate your salary with RotaCalc.',
+  title: 'OnTheDoc - NHS Rota Compliance & Salary Tool',
+  description: 'Easily input your rota, check compliance against NHS guidelines, and estimate your salary with OnTheDoc.',
 };
 
 export default function RootLayout({
